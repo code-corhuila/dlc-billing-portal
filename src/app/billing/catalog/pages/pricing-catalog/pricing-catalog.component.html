@@ -1,0 +1,326 @@
+<main class="billing-page">
+
+  <header class="page-header">
+
+    <div>
+      <p class="eyebrow">
+        Billing
+      </p>
+
+      <h1>
+        Precios de procedimientos
+      </h1>
+
+      <p class="page-description">
+        Consulta las versiones vigentes de precios
+        y crea nuevas versiones para los
+        procedimientos odontológicos.
+      </p>
+    </div>
+
+    <div class="header-actions">
+
+      <a routerLink="/prices/rules" class="secondary-link">
+        Reglas adicionales
+      </a>
+
+      <button type="button" class="primary-button" (click)="openForm()">
+        + Nuevo precio
+      </button>
+
+    </div>
+
+  </header>
+
+
+  <section class="mock-notice">
+
+    <strong>
+      Demostración Cut 2
+    </strong>
+
+    <span>
+      Los datos mostrados son ficticios y todavía
+      no están conectados al backend de Billing.
+    </span>
+
+  </section>
+
+
+  <section class="toolbar">
+
+    <label class="search-field">
+
+      <span>
+        Buscar procedimiento
+      </span>
+
+      <input type="search" placeholder="Nombre o código..." [(ngModel)]="searchTerm" />
+
+    </label>
+
+
+    <button type="button" class="secondary-button" (click)="simulateError()">
+      Simular error
+    </button>
+
+
+    <button type="button" class="secondary-button" (click)="simulateEmpty()">
+      Simular vacío
+    </button>
+
+
+    <button type="button" class="secondary-button" (click)="restoreFixtures()">
+      Restaurar
+    </button>
+
+  </section>
+
+
+  @if (errorMessage()) {
+
+  <section class="state-card error-state">
+
+    <h2>
+      No fue posible cargar el catálogo
+    </h2>
+
+    <p>
+      {{ errorMessage() }}
+    </p>
+
+    <button type="button" class="secondary-button" (click)="restoreFixtures()">
+      Intentar nuevamente
+    </button>
+
+  </section>
+
+  } @else if (filteredPrices.length === 0) {
+
+  <section class="state-card">
+
+    <h2>
+      No hay precios para mostrar
+    </h2>
+
+    <p>
+      No se encontraron versiones de precios
+      con los criterios actuales.
+    </p>
+
+  </section>
+
+  } @else {
+
+  <section class="catalog-card">
+
+    <div class="table-wrapper">
+
+      <table>
+
+        <thead>
+          <tr>
+            <th>Procedimiento</th>
+            <th>Código</th>
+            <th>Precio</th>
+            <th>Versión</th>
+            <th>Vigente desde</th>
+            <th>Estado</th>
+          </tr>
+        </thead>
+
+        <tbody>
+
+          @for (
+          price of filteredPrices;
+          track price.id
+          ) {
+
+          <tr>
+
+            <td>
+              <strong>
+                {{ price.procedureName }}
+              </strong>
+            </td>
+
+            <td>
+              {{ price.procedureCode }}
+            </td>
+
+            <td>
+              {{ formatMoney(price.amount) }}
+            </td>
+
+            <td>
+              v{{ price.version }}
+            </td>
+
+            <td>
+              {{ price.validFrom }}
+            </td>
+
+            <td>
+
+              <span class="status-badge" [class.active]="price.active">
+                {{
+                price.active
+                ? 'Vigente'
+                : 'Histórico'
+                }}
+              </span>
+
+            </td>
+
+          </tr>
+
+          }
+
+        </tbody>
+
+      </table>
+
+    </div>
+
+  </section>
+
+  }
+
+
+  @if (successMessage()) {
+
+  <section class="success-message">
+    {{ successMessage() }}
+  </section>
+
+  }
+
+
+  @if (formVisible()) {
+
+  <div class="modal-backdrop">
+
+    <section class="modal" role="dialog" aria-modal="true" aria-labelledby="new-price-title">
+
+      <header class="modal-header">
+
+        <div>
+
+          <p class="eyebrow">
+            Nueva versión
+          </p>
+
+          <h2 id="new-price-title">
+            Registrar precio
+          </h2>
+
+        </div>
+
+
+        <button type="button" class="icon-button" aria-label="Cerrar formulario" [disabled]="submitting()"
+          (click)="closeForm()">
+          ×
+        </button>
+
+      </header>
+
+
+      <form (ngSubmit)="submitPrice()" #priceForm="ngForm">
+
+        <div class="form-grid">
+
+          <label>
+
+            <span>
+              Código del procedimiento *
+            </span>
+
+            <input type="text" name="procedureCode" [(ngModel)]="form.procedureCode" required
+              [disabled]="submitting()" />
+
+          </label>
+
+
+          <label>
+
+            <span>
+              Nombre del procedimiento *
+            </span>
+
+            <input type="text" name="procedureName" [(ngModel)]="form.procedureName" required
+              [disabled]="submitting()" />
+
+          </label>
+
+
+          <label>
+
+            <span>
+              Precio en COP *
+            </span>
+
+            <input type="number" name="amount" [(ngModel)]="form.amount" required min="1" [disabled]="submitting()" />
+
+            @if (form.amount <= 0) { <small class="validation-message">
+              El precio debe ser mayor que cero.
+              </small>
+
+              }
+
+          </label>
+
+
+          <label>
+
+            <span>
+              Moneda
+            </span>
+
+            <input type="text" value="COP" disabled />
+
+          </label>
+
+
+          <label>
+
+            <span>
+              Vigente desde *
+            </span>
+
+            <input type="date" name="validFrom" [(ngModel)]="form.validFrom" required [disabled]="submitting()" />
+
+          </label>
+
+        </div>
+
+
+        <footer class="modal-actions">
+
+          <button type="button" class="secondary-button" [disabled]="submitting()" (click)="closeForm()">
+            Cancelar
+          </button>
+
+
+          <button type="submit" class="primary-button" [disabled]="
+                priceForm.invalid ||
+                form.amount <= 0 ||
+                submitting()
+              ">
+            {{
+            submitting()
+            ? 'Guardando...'
+            : 'Guardar nueva versión'
+            }}
+          </button>
+
+        </footer>
+
+      </form>
+
+    </section>
+
+  </div>
+
+  }
+
+</main>

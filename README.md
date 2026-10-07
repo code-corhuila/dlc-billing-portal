@@ -26,3 +26,44 @@ En etapas posteriores el portal podrá cubrir funcionalidades documentadas del d
 El contenedor transversal continúa siendo dueño de la sesión, navegación global, cliente HTTP y URL del API Gateway. `dlc-billing-portal` no debe crear una sesión paralela ni acceder directamente a la base de datos.
 
 Puerto de desarrollo reservado en este scaffold: `4204`.
+
+Para previsualizar el catálogo de forma independiente, ejecuta `npm start`. Para servir el remote Native Federation que consume el contenedor, ejecuta `npm run start:federation`; el remote debe abrirse desde el contenedor, que proporciona el mapa de módulos compartidos.
+
+## HU-BIL-001 — Mock pricing catalog
+
+This portal currently includes a mock implementation for the Billing pricing catalog.
+
+### Implemented
+
+- Procedure price catalog with fictional fixture data.
+- Search by procedure name or code.
+- Procedure price versioning simulation.
+- Historical and active price states.
+- Positive amount validation.
+- COP currency representation.
+- Additional charge rules catalog.
+- Additional charge rule versioning simulation.
+- Search by rule name or code.
+- Empty state.
+- Error state.
+- Success state.
+- Disabled submit actions while a simulated request is running.
+
+### Mock behavior
+
+The current implementation uses local fixture data only.
+
+No real Billing API, API Gateway, database, JWT, or authentication integration is included in this stage.
+
+Data is reset when the application is reloaded.
+
+### Available routes
+
+- `/prices`
+- `/prices/rules`
+
+### Run locally
+
+```bash
+npm install
+npm start
