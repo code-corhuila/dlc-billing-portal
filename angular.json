@@ -11,16 +11,26 @@
       "architect": {
         "build": {
           "builder": "@angular-architects/native-federation:build",
-          "options": { "target": "dlc-billing-portal:build-original:production" },
+          "options": {
+            "target": "dlc-billing-portal:build-original:production"
+          },
           "configurations": {
-            "production": { "target": "dlc-billing-portal:build-original:production" },
-            "development": { "target": "dlc-billing-portal:build-original:development", "dev": true }
+            "production": {
+              "target": "dlc-billing-portal:build-original:production"
+            },
+            "development": {
+              "target": "dlc-billing-portal:build-original:development",
+              "dev": true
+            }
           },
           "defaultConfiguration": "production"
         },
         "serve": {
           "builder": "@angular-architects/native-federation:build",
-          "options": { "target": "dlc-billing-portal:serve-original:development", "dev": true }
+          "options": {
+            "target": "dlc-billing-portal:serve-original:development",
+            "dev": true
+          }
         },
         "build-original": {
           "builder": "@angular/build:application",
@@ -28,19 +38,43 @@
             "outputPath": "dist/dlc-billing-portal",
             "index": "src/index.html",
             "browser": "src/main.ts",
+            "polyfills": [
+              "es-module-shims"
+            ],
             "tsConfig": "tsconfig.app.json",
-            "assets": [{ "glob": "**/*", "input": "public" }],
+            "assets": [
+              {
+                "glob": "**/*",
+                "input": "public"
+              }
+            ],
             "styles": []
           },
           "configurations": {
-            "production": { "outputHashing": "all" },
-            "development": { "optimization": false, "sourceMap": true }
+            "production": {
+              "outputHashing": "all"
+            },
+            "development": {
+              "optimization": false,
+              "sourceMap": true
+            }
           },
           "defaultConfiguration": "production"
         },
         "serve-original": {
           "builder": "@angular/build:dev-server",
-          "options": { "buildTarget": "dlc-billing-portal:build-original:development", "port": 4204 }
+          "options": {
+            "port": 4204
+          },
+          "configurations": {
+            "development": {
+              "buildTarget": "dlc-billing-portal:build-original:development"
+            },
+            "production": {
+              "buildTarget": "dlc-billing-portal:build-original:production"
+            }
+          },
+          "defaultConfiguration": "development"
         }
       }
     }
