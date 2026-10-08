@@ -1,7 +1,17 @@
-import { describe, expect, it } from 'vitest';
+import {
+  afterEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest';
 import { BillingPageComponent } from './billing-page.component';
 
 describe('BillingPageComponent', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('starts with a draft invoice ready for review', () => {
     const component = new BillingPageComponent();
 
@@ -88,6 +98,24 @@ describe('BillingPageComponent', () => {
 
     component.startIssuanceRequest();
     component.completeIssuanceRequest();
+
+    expect(component.isSubmitting).toBe(false);
+    expect(component.invoice.status).toBe('ISSUED');
+    expect(component.feedbackMessage).toBe(
+      'Factura emitida correctamente.',
+    );
+  });
+
+  it('completes the simulated issuance request automatically', () => {
+    vi.useFakeTimers();
+
+    const component = new BillingPageComponent();
+
+    component.startIssuanceRequest();
+
+    expect(component.isSubmitting).toBe(true);
+
+    vi.runAllTimers();
 
     expect(component.isSubmitting).toBe(false);
     expect(component.invoice.status).toBe('ISSUED');

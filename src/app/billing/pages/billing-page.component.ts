@@ -227,6 +227,10 @@ export class BillingPageComponent {
 
     this.isSubmitting = true;
     this.feedbackMessage = '';
+
+    setTimeout(() => {
+      this.completeIssuanceRequest();
+    }, 500);
   }
 
   completeIssuanceRequest(): void {
