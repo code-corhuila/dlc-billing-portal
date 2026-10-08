@@ -5,7 +5,8 @@
   "scripts": {
     "build": "ng build",
     "start": "ng run dlc-billing-portal:serve-original",
-    "start:federation": "ng serve"
+    "start:federation": "ng serve",
+    "test": "vitest run"
   },
   "dependencies": {
     "@angular-architects/native-federation": "^21.0.0",
@@ -24,7 +25,8 @@
     "@angular/build": "^21.0.0",
     "@angular/cli": "^21.0.0",
     "@angular/compiler-cli": "^21.0.0",
-    "typescript": "~5.9.0"
+    "typescript": "~5.9.0",
+    "vitest": "^4.1.11"
   },
   "engines": {
     "node": ">=22"
