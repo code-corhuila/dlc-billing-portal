@@ -140,6 +140,7 @@ interface InvoiceReview {
       }
     </main>
   `,
+  styleUrl: './billing-page.component.css',
 })
 export class BillingPageComponent {
   feedbackMessage = '';
