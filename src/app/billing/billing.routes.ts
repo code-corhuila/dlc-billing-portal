@@ -24,6 +24,15 @@ export const BILLING_ROUTES: Routes = [
         (m) => m.ExtraChargeRulesComponent,
       ),
   },
+  {
+    path: 'invoices/:id',
+    loadComponent: () =>
+      import(
+        './pages/billing-page.component'
+      ).then(
+        (m) => m.BillingPageComponent,
+      ),
+  },
 ];
 
 export default BILLING_ROUTES;
