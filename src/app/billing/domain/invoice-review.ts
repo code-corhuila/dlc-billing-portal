@@ -26,3 +26,7 @@ export function calculateInvoiceTotal(chargeAmounts: number[]): number {
     0,
   );
 }
+
+export function canDownloadInvoicePdf(status: InvoiceStatus): boolean {
+  return status === 'ISSUED';
+}
