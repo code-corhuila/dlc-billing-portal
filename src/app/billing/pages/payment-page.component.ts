@@ -19,6 +19,7 @@ interface PaymentInvoice {
   selector: 'dlc-payment-page',
   standalone: true,
   templateUrl: './payment-page.component.html',
+  styleUrl: './payment-page.component.css',
 })
 
 export class PaymentPageComponent {
