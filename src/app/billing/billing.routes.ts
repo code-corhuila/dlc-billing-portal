@@ -33,6 +33,15 @@ export const BILLING_ROUTES: Routes = [
         (m) => m.BillingPageComponent,
       ),
   },
+  {
+    path: 'invoices/:id/payments/new',
+    loadComponent: () =>
+      import(
+        './pages/payment-page.component'
+      ).then(
+        (m) => m.PaymentPageComponent,
+      ),
+  },
 ];
 
 export default BILLING_ROUTES;
