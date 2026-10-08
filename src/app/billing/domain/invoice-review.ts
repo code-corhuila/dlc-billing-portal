@@ -4,8 +4,11 @@ export function canEditInvoice(status: InvoiceStatus): boolean {
   return status === 'DRAFT';
 }
 
-export function canIssueInvoice(status: InvoiceStatus): boolean {
-  return status === 'DRAFT';
+export function canIssueInvoice(
+  status: InvoiceStatus,
+  chargeAmounts: number[],
+): boolean {
+  return status === 'DRAFT' && chargeAmounts.length > 0;
 }
 
 export function issueInvoice(status: InvoiceStatus): InvoiceStatus {
