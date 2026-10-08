@@ -24,3 +24,10 @@ export function resolvePaymentStatus(
     ? 'PAID'
     : 'PARTIAL';
 }
+
+export function isDuplicatePayment(
+  idempotencyKey: string,
+  processedKeys: string[],
+): boolean {
+  return processedKeys.includes(idempotencyKey);
+}

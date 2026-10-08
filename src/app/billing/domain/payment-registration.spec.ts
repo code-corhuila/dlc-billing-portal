@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   calculateRemainingBalance,
+  isDuplicatePayment,
   isValidPaymentAmount,
   resolvePaymentStatus,
 } from './payment-registration';
@@ -53,5 +54,33 @@ describe('payment registration', () => {
     expect(
       resolvePaymentStatus(0),
     ).toBe('PAID');
+  });
+
+  it('detects a duplicated payment idempotency key', () => {
+    const processedKeys = [
+      'payment-001',
+      'payment-002',
+    ];
+
+    expect(
+      isDuplicatePayment(
+        'payment-002',
+        processedKeys,
+      ),
+    ).toBe(true);
+  });
+
+  it('accepts a new payment idempotency key', () => {
+    const processedKeys = [
+      'payment-001',
+      'payment-002',
+    ];
+
+    expect(
+      isDuplicatePayment(
+        'payment-003',
+        processedKeys,
+      ),
+    ).toBe(false);
   });
 });
