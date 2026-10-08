@@ -109,6 +109,12 @@ interface InvoiceReview {
             </p>
           }
 
+          @if (isSubmitting) {
+            <p>
+              Emitiendo factura...
+            </p>
+          }
+
           @if (feedbackMessage) {
             <p>
               {{ feedbackMessage }}
@@ -118,7 +124,7 @@ interface InvoiceReview {
           <button
             type="button"
             [disabled]="!canIssue"
-            (click)="issueReviewedInvoice()"
+            (click)="startIssuanceRequest()"
           >
             Emitir factura
           </button>
@@ -139,6 +145,7 @@ export class BillingPageComponent {
   feedbackMessage = '';
   hasLoadError = false;
   errorMessage = '';
+  isSubmitting = false;
 
   invoice: InvoiceReview = {
     id: 'invoice-001',
@@ -180,9 +187,12 @@ export class BillingPageComponent {
   }
 
   get canIssue(): boolean {
-    return canIssueInvoice(
-      this.invoice.status,
-      this.chargeAmounts,
+    return (
+      !this.isSubmitting &&
+      canIssueInvoice(
+        this.invoice.status,
+        this.chargeAmounts,
+      )
     );
   }
 
@@ -208,6 +218,24 @@ export class BillingPageComponent {
 
     this.feedbackMessage =
       'Factura emitida correctamente.';
+  }
+
+  startIssuanceRequest(): void {
+    if (!this.canIssue) {
+      return;
+    }
+
+    this.isSubmitting = true;
+    this.feedbackMessage = '';
+  }
+
+  completeIssuanceRequest(): void {
+    if (!this.isSubmitting) {
+      return;
+    }
+
+    this.isSubmitting = false;
+    this.issueReviewedInvoice();
   }
 
   showLoadError(): void {

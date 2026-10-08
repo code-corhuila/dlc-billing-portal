@@ -67,4 +67,32 @@ describe('BillingPageComponent', () => {
       'Descarga de PDF simulada.',
     );
   });
+
+  it('starts with no invoice request in progress', () => {
+    const component = new BillingPageComponent();
+
+    expect(component.isSubmitting).toBe(false);
+  });
+
+  it('disables invoice issuance while a simulated request is in progress', () => {
+    const component = new BillingPageComponent();
+
+    component.startIssuanceRequest();
+
+    expect(component.isSubmitting).toBe(true);
+    expect(component.canIssue).toBe(false);
+  });
+
+  it('completes the simulated issuance request', () => {
+    const component = new BillingPageComponent();
+
+    component.startIssuanceRequest();
+    component.completeIssuanceRequest();
+
+    expect(component.isSubmitting).toBe(false);
+    expect(component.invoice.status).toBe('ISSUED');
+    expect(component.feedbackMessage).toBe(
+      'Factura emitida correctamente.',
+    );
+  });
 });
