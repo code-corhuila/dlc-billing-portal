@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  calculateInvoiceTotal,
   canEditInvoice,
   canIssueInvoice,
   InvoiceStatus,
@@ -32,5 +33,15 @@ describe('invoice review rules', () => {
     const status: InvoiceStatus = 'ISSUED';
 
     expect(issueInvoice(status)).toBe('ISSUED');
+  });
+
+  it('calculates the invoice total from its charge amounts', () => {
+    const chargeAmounts = [80000, 20000, 30000];
+
+    expect(calculateInvoiceTotal(chargeAmounts)).toBe(130000);
+  });
+
+  it('returns zero when the invoice has no charges', () => {
+    expect(calculateInvoiceTotal([])).toBe(0);
   });
 });
