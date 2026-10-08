@@ -18,75 +18,9 @@ interface PaymentInvoice {
 @Component({
   selector: 'dlc-payment-page',
   standalone: true,
-  template: `
-    <main>
-      <header>
-        <p>Billing</p>
-        <h1>Registro de pago</h1>
-        <p>
-          Registra un pago sobre una factura.
-        </p>
-      </header>
-
-      <section>
-        <h2>{{ invoice.number }}</h2>
-
-        <p>
-          <strong>Total:</strong>
-          COP {{ invoice.total.toLocaleString('es-CO') }}
-        </p>
-
-        <p>
-          <strong>Pagado:</strong>
-          COP {{ invoice.paid.toLocaleString('es-CO') }}
-        </p>
-
-        <p>
-          <strong>Saldo pendiente:</strong>
-          COP {{ pendingBalance.toLocaleString('es-CO') }}
-        </p>
-
-        <p>
-          <strong>Estado:</strong>
-          {{ invoice.status }}
-        </p>
-      </section>
-
-      <section>
-        <label for="paymentAmount">
-          Valor del pago
-        </label>
-
-        <input
-          id="paymentAmount"
-          type="number"
-          min="0"
-          [(value)]="paymentAmount"
-        />
-
-        @if (isSubmitting) {
-          <p>
-            Registrando pago...
-          </p>
-        }
-
-        <button
-          type="button"
-          [disabled]="!canRegisterPayment"
-          (click)="startPaymentRequest()"
-        >
-          Registrar pago
-        </button>
-
-        @if (feedbackMessage) {
-          <p>
-            {{ feedbackMessage }}
-          </p>
-        }
-      </section>
-    </main>
-  `,
+  templateUrl: './payment-page.component.html',
 })
+
 export class PaymentPageComponent {
   paymentAmount = 0;
   feedbackMessage = '';

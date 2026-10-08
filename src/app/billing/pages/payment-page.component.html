@@ -1,0 +1,160 @@
+<main class="payment-page">
+  <header class="page-header">
+    <div>
+      <p class="page-eyebrow">Facturación</p>
+
+      <h1>Registro de pago</h1>
+
+      <p class="page-description">
+        Registra un pago sobre una factura pendiente.
+      </p>
+    </div>
+  </header>
+
+  <div class="payment-layout">
+    <section
+      class="invoice-card"
+      aria-labelledby="invoice-title"
+    >
+      <div class="card-header">
+        <div>
+          <p class="card-label">
+            Factura
+          </p>
+
+          <h2 id="invoice-title">
+            {{ invoice.number }}
+          </h2>
+        </div>
+
+        <span
+          class="status-badge"
+          [class.status-paid]="invoice.status === 'PAID'"
+        >
+          {{
+            invoice.status === 'PAID'
+              ? 'Pagada'
+              : 'Pago parcial'
+          }}
+        </span>
+      </div>
+
+      <div class="invoice-summary">
+        <article class="summary-item">
+          <span>Total factura</span>
+
+          <strong>
+            COP
+            {{ invoice.total.toLocaleString('es-CO') }}
+          </strong>
+        </article>
+
+        <article class="summary-item">
+          <span>Total pagado</span>
+
+          <strong>
+            COP
+            {{ invoice.paid.toLocaleString('es-CO') }}
+          </strong>
+        </article>
+      </div>
+
+      <div class="balance-panel">
+        <span>Saldo pendiente</span>
+
+        <strong>
+          COP
+          {{ pendingBalance.toLocaleString('es-CO') }}
+        </strong>
+      </div>
+    </section>
+
+    <aside
+      class="payment-card"
+      aria-labelledby="payment-title"
+    >
+      <div class="payment-card-header">
+        <p class="card-label">
+          Resumen de cobro
+        </p>
+
+        <h2 id="payment-title">
+          Registrar pago
+        </h2>
+      </div>
+
+      <div class="payment-balance">
+        <span>Saldo actual</span>
+
+        <strong>
+          COP
+          {{ pendingBalance.toLocaleString('es-CO') }}
+        </strong>
+      </div>
+
+      <div class="form-field">
+        <label for="paymentAmount">
+          Valor del pago
+        </label>
+
+        <div class="amount-input">
+          <span>COP</span>
+
+          <input
+            id="paymentAmount"
+            type="number"
+            min="0"
+            [max]="pendingBalance"
+            [(value)]="paymentAmount"
+            [disabled]="isSubmitting"
+            aria-describedby="payment-help"
+          />
+        </div>
+
+        <small id="payment-help">
+          El valor no puede superar el saldo pendiente.
+        </small>
+      </div>
+
+      @if (isSubmitting) {
+        <div
+          class="feedback feedback-loading"
+          role="status"
+        >
+          <span class="loading-indicator"></span>
+          Registrando pago...
+        </div>
+      }
+
+      @if (feedbackMessage && !isSubmitting) {
+        <div
+          class="feedback"
+          [class.feedback-success]="
+            feedbackMessage ===
+            'Pago registrado correctamente.'
+          "
+          [class.feedback-error]="
+            feedbackMessage !==
+            'Pago registrado correctamente.'
+          "
+          role="status"
+        >
+          {{ feedbackMessage }}
+        </div>
+      }
+
+      <button
+        class="payment-button"
+        type="button"
+        [disabled]="!canRegisterPayment"
+        (click)="startPaymentRequest()"
+      >
+        @if (isSubmitting) {
+          Procesando...
+        } @else {
+          Registrar pago
+        }
+      </button>
+    </aside>
+  </div>
+</main>
