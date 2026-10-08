@@ -1,8 +1,18 @@
-import { describe, expect, it } from 'vitest';
+import {
+  afterEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest';
 
 import { PaymentPageComponent } from './payment-page.component';
 
 describe('PaymentPageComponent', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('starts with mock invoice payment data', () => {
     const component = new PaymentPageComponent();
 
@@ -61,5 +71,42 @@ describe('PaymentPageComponent', () => {
       'Este pago ya fue procesado.',
     );
     expect(component.invoice.paid).toBe(30000);
+  });
+
+  it('starts with no payment request in progress', () => {
+    const component = new PaymentPageComponent();
+
+    expect(component.isSubmitting).toBe(false);
+  });
+
+  it('disables payment registration while a simulated request is in progress', () => {
+    const component = new PaymentPageComponent();
+
+    component.paymentAmount = 40000;
+    component.startPaymentRequest();
+
+    expect(component.isSubmitting).toBe(true);
+    expect(component.canRegisterPayment).toBe(false);
+  });
+
+  it('completes the simulated payment request automatically', () => {
+    vi.useFakeTimers();
+
+    const component = new PaymentPageComponent();
+
+    component.paymentAmount = 40000;
+    component.startPaymentRequest();
+
+    expect(component.isSubmitting).toBe(true);
+
+    vi.runAllTimers();
+
+    expect(component.isSubmitting).toBe(false);
+    expect(component.invoice.paid).toBe(70000);
+    expect(component.pendingBalance).toBe(60000);
+    expect(component.invoice.status).toBe('PARTIAL');
+    expect(component.feedbackMessage).toBe(
+      'Pago registrado correctamente.',
+    );
   });
 });
