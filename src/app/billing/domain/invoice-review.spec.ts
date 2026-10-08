@@ -31,16 +31,24 @@ describe('invoice review rules', () => {
     expect(canIssueInvoice(status, chargeAmounts)).toBe(false);
   });
 
-  it('transitions a draft invoice to issued', () => {
+  it('transitions a draft invoice with charges to issued', () => {
+    const status: InvoiceStatus = 'DRAFT';
+    const chargeAmounts = [80000, 20000];
+
+    expect(issueInvoice(status, chargeAmounts)).toBe('ISSUED');
+  });
+
+  it('keeps a draft invoice without charges in draft', () => {
     const status: InvoiceStatus = 'DRAFT';
 
-    expect(issueInvoice(status)).toBe('ISSUED');
+    expect(issueInvoice(status, [])).toBe('DRAFT');
   });
 
   it('keeps an already issued invoice issued', () => {
     const status: InvoiceStatus = 'ISSUED';
+    const chargeAmounts = [80000];
 
-    expect(issueInvoice(status)).toBe('ISSUED');
+    expect(issueInvoice(status, chargeAmounts)).toBe('ISSUED');
   });
 
   it('calculates the invoice total from its charge amounts', () => {
