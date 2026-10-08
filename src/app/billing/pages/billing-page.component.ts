@@ -25,7 +25,91 @@ interface InvoiceReview {
 @Component({
   selector: 'dlc-billing-page',
   standalone: true,
-  template: '',
+  template: `
+    <main>
+      <header>
+        <p>Billing</p>
+        <h1>Revisión de factura</h1>
+        <p>
+          Revisa los cargos antes de emitir la factura.
+        </p>
+      </header>
+
+      <section>
+        <h2>{{ invoice.number }}</h2>
+
+        <p>
+          <strong>Paciente:</strong>
+          {{ invoice.patientName }}
+        </p>
+
+        <p>
+          <strong>Estado:</strong>
+          {{ invoice.status }}
+        </p>
+      </section>
+
+      <section>
+        <h2>Cargos</h2>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Concepto</th>
+              <th>Valor</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            @for (charge of invoice.charges; track charge.description) {
+              <tr>
+                <td>{{ charge.description }}</td>
+                <td>
+                  COP {{ charge.amount.toLocaleString('es-CO') }}
+                </td>
+              </tr>
+            }
+          </tbody>
+
+          <tfoot>
+            <tr>
+              <th>Total</th>
+              <th>
+                COP {{ invoiceTotal.toLocaleString('es-CO') }}
+              </th>
+            </tr>
+          </tfoot>
+        </table>
+      </section>
+
+      <section>
+        @if (canEdit) {
+          <p>
+            La factura todavía está disponible para revisión.
+          </p>
+        } @else {
+          <p>
+            La factura emitida es inmutable.
+          </p>
+        }
+
+        <button
+          type="button"
+          [disabled]="!canIssue"
+          (click)="issueReviewedInvoice()"
+        >
+          Emitir factura
+        </button>
+
+        <button
+          type="button"
+          [disabled]="!canDownloadPdf"
+        >
+          Descargar PDF
+        </button>
+      </section>
+    </main>
+  `,
 })
 export class BillingPageComponent {
   invoice: InvoiceReview = {
