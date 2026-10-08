@@ -109,4 +109,22 @@ describe('PaymentPageComponent', () => {
       'Pago registrado correctamente.',
     );
   });
+
+  it('rejects a second payment attempt with the same processed key', () => {
+    const component = new PaymentPageComponent();
+
+    component.idempotencyKey = 'payment-003';
+    component.paymentAmount = 20000;
+    component.registerPayment();
+
+    expect(component.invoice.paid).toBe(50000);
+
+    component.paymentAmount = 10000;
+    component.registerPayment();
+
+    expect(component.feedbackMessage).toBe(
+      'Este pago ya fue procesado.',
+    );
+    expect(component.invoice.paid).toBe(50000);
+  });
 });
