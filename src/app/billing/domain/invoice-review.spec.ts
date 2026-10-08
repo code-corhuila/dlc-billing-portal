@@ -4,6 +4,7 @@ import {
   canEditInvoice,
   canIssueInvoice,
   InvoiceStatus,
+  issueInvoice,
 } from './invoice-review';
 
 describe('invoice review rules', () => {
@@ -19,5 +20,17 @@ describe('invoice review rules', () => {
 
     expect(canEditInvoice(status)).toBe(false);
     expect(canIssueInvoice(status)).toBe(false);
+  });
+
+  it('transitions a draft invoice to issued', () => {
+    const status: InvoiceStatus = 'DRAFT';
+
+    expect(issueInvoice(status)).toBe('ISSUED');
+  });
+
+  it('keeps an already issued invoice issued', () => {
+    const status: InvoiceStatus = 'ISSUED';
+
+    expect(issueInvoice(status)).toBe('ISSUED');
   });
 });
