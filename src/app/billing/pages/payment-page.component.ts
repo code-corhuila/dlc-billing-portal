@@ -154,6 +154,10 @@ export class PaymentPageComponent {
         remainingBalance,
       );
 
+    this.processedKeys.push(
+      this.idempotencyKey,
+    );
+
     this.feedbackMessage =
       'Pago registrado correctamente.';
   }
