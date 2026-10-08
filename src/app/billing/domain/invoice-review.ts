@@ -7,3 +7,7 @@ export function canEditInvoice(status: InvoiceStatus): boolean {
 export function canIssueInvoice(status: InvoiceStatus): boolean {
   return status === 'DRAFT';
 }
+
+export function issueInvoice(status: InvoiceStatus): InvoiceStatus {
+  return status === 'DRAFT' ? 'ISSUED' : status;
+}
