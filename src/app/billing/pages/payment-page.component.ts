@@ -64,9 +64,16 @@ interface PaymentInvoice {
           [(value)]="paymentAmount"
         />
 
+        @if (isSubmitting) {
+          <p>
+            Registrando pago...
+          </p>
+        }
+
         <button
           type="button"
-          (click)="registerPayment()"
+          [disabled]="!canRegisterPayment"
+          (click)="startPaymentRequest()"
         >
           Registrar pago
         </button>
@@ -84,6 +91,7 @@ export class PaymentPageComponent {
   paymentAmount = 0;
   feedbackMessage = '';
   idempotencyKey = 'payment-003';
+  isSubmitting = false;
 
   readonly processedKeys = [
     'payment-001',
@@ -99,6 +107,16 @@ export class PaymentPageComponent {
 
   get pendingBalance(): number {
     return this.invoice.total - this.invoice.paid;
+  }
+
+  get canRegisterPayment(): boolean {
+    return (
+      !this.isSubmitting &&
+      isValidPaymentAmount(
+        this.paymentAmount,
+        this.pendingBalance,
+      )
+    );
   }
 
   registerPayment(): void {
@@ -138,5 +156,27 @@ export class PaymentPageComponent {
 
     this.feedbackMessage =
       'Pago registrado correctamente.';
+  }
+
+  startPaymentRequest(): void {
+    if (!this.canRegisterPayment) {
+      return;
+    }
+
+    this.isSubmitting = true;
+    this.feedbackMessage = '';
+
+    setTimeout(() => {
+      this.completePaymentRequest();
+    }, 500);
+  }
+
+  completePaymentRequest(): void {
+    if (!this.isSubmitting) {
+      return;
+    }
+
+    this.isSubmitting = false;
+    this.registerPayment();
   }
 }
