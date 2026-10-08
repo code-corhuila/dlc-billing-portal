@@ -11,8 +11,13 @@ export function canIssueInvoice(
   return status === 'DRAFT' && chargeAmounts.length > 0;
 }
 
-export function issueInvoice(status: InvoiceStatus): InvoiceStatus {
-  return status === 'DRAFT' ? 'ISSUED' : status;
+export function issueInvoice(
+  status: InvoiceStatus,
+  chargeAmounts: number[],
+): InvoiceStatus {
+  return canIssueInvoice(status, chargeAmounts)
+    ? 'ISSUED'
+    : status;
 }
 
 export function calculateInvoiceTotal(chargeAmounts: number[]): number {
