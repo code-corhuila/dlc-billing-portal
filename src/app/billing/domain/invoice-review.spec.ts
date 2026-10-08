@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   calculateInvoiceTotal,
+  canDownloadInvoicePdf,
   canEditInvoice,
   canIssueInvoice,
   InvoiceStatus,
@@ -59,5 +60,17 @@ describe('invoice review rules', () => {
 
   it('returns zero when the invoice has no charges', () => {
     expect(calculateInvoiceTotal([])).toBe(0);
+  });
+
+  it('does not allow PDF download while the invoice is still a draft', () => {
+    const status: InvoiceStatus = 'DRAFT';
+
+    expect(canDownloadInvoicePdf(status)).toBe(false);
+  });
+
+  it('allows PDF download after the invoice is issued', () => {
+    const status: InvoiceStatus = 'ISSUED';
+
+    expect(canDownloadInvoicePdf(status)).toBe(true);
   });
 });
