@@ -101,11 +101,13 @@
           <span>COP</span>
 
           <input
+            #paymentAmountInput
             id="paymentAmount"
             type="number"
             min="0"
             [max]="pendingBalance"
-            [(value)]="paymentAmount"
+            [value]="paymentAmount"
+            (input)="updatePaymentAmount(paymentAmountInput.value)"
             [disabled]="isSubmitting"
             aria-describedby="payment-help"
           />
