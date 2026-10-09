@@ -127,4 +127,12 @@ describe('PaymentPageComponent', () => {
     );
     expect(component.invoice.paid).toBe(50000);
   });
+
+  it('updates the payment amount from the input value', () => {
+    const component = new PaymentPageComponent();
+
+    component.updatePaymentAmount('40000');
+
+    expect(component.paymentAmount).toBe(40000);
+  });
 });
