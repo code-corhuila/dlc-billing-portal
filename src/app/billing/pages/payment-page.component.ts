@@ -53,6 +53,9 @@ export class PaymentPageComponent {
       )
     );
   }
+updatePaymentAmount(value: string): void {
+  this.paymentAmount = Number(value);
+}
 
   registerPayment(): void {
     if (
