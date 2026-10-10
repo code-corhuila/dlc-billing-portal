@@ -7,6 +7,7 @@ in dlc-docs at `638e4f227c318b9e62bc1ce5a152c71414c72d51`.
 ## Reproduce
 
 Use Node 22 or newer: `npm ci`, `npm run test:coverage`, `npm run build`.
+For CI reproduction, use Node 22 and npm 10.9.9, as recorded in the failed run.
 Vitest 4.1.11 and its matching V8 provider measured the baseline on 2026-10-10,
 against portal source at `b4c75e1259b09fea957612ad952cec0d30e7d829`.
 The measurement configuration is introduced by this maintenance increment.
@@ -43,3 +44,13 @@ Local build passed with exit code 0. A separate gate check overriding global
 lines to 80 failed with exit code 1 as expected, while all 62 tests still passed.
 CI execution, independent revision-specific DoD review and integrated owner
 responses remain pending; this increment does not close the issue or HU.
+
+## CI installation follow-up
+
+[CI run 38091374125](https://github.com/code-corhuila/dlc-billing-portal/actions/runs/38091374125)
+failed before tests: npm 10.9.9 required omitted optional peers `@emnapi/core`
+and `@emnapi/runtime` at 1.11.3. Regenerating the lockfile with npm 10 restores
+those entries and normalizes peer metadata without changing existing versions.
+A clean installation with npm 10.9.4 and lockfile validation with npm 10.9.9
+both passed locally on Windows. All 62 tests and the build passed again with
+unchanged coverage. Updated Ubuntu CI still requires verification after push.
