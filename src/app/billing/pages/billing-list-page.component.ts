@@ -136,7 +136,7 @@ interface BillingInvoiceListItem {
 
             <tbody>
               @for (
-                invoice of filteredInvoices;
+                invoice of paginatedInvoices;
                 track invoice.id
               ) {
                 <tr>
@@ -168,6 +168,28 @@ interface BillingInvoiceListItem {
               }
             </tbody>
           </table>
+
+          <nav aria-label="Paginación de facturas">
+            <button
+              type="button"
+              [disabled]="currentPage === 1"
+              (click)="previousPage()"
+            >
+              Anterior
+            </button>
+
+            <span>
+              Página {{ currentPage }} de {{ totalPages }}
+            </span>
+
+            <button
+              type="button"
+              [disabled]="currentPage === totalPages"
+              (click)="nextPage()"
+            >
+              Siguiente
+            </button>
+          </nav>
         }
       </section>
     </main>
@@ -178,8 +200,11 @@ export class BillingListPageComponent {
   readonly pendingInvoices = 2;
   readonly paidInvoices = 1;
 
+  readonly pageSize = 2;
+
   searchTerm = '';
   selectedStatus: BillingInvoiceStatusFilter = 'ALL';
+  currentPage = 1;
 
   readonly invoices: BillingInvoiceListItem[] = [
     {
@@ -229,6 +254,25 @@ export class BillingListPageComponent {
     });
   }
 
+  get totalPages(): number {
+    return Math.max(
+      1,
+      Math.ceil(
+        this.filteredInvoices.length / this.pageSize,
+      ),
+    );
+  }
+
+  get paginatedInvoices(): BillingInvoiceListItem[] {
+    const startIndex =
+      (this.currentPage - 1) * this.pageSize;
+
+    return this.filteredInvoices.slice(
+      startIndex,
+      startIndex + this.pageSize,
+    );
+  }
+
   updateSelectedStatus(value: string): void {
     const allowedStatuses: BillingInvoiceStatusFilter[] = [
       'ALL',
@@ -246,6 +290,18 @@ export class BillingListPageComponent {
     ) {
       this.selectedStatus =
         value as BillingInvoiceStatusFilter;
+    }
+  }
+
+  nextPage(): void {
+    if (this.currentPage < this.totalPages) {
+      this.currentPage += 1;
+    }
+  }
+
+  previousPage(): void {
+    if (this.currentPage > 1) {
+      this.currentPage -= 1;
     }
   }
 

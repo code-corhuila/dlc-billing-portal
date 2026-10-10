@@ -79,4 +79,56 @@ describe('BillingListPageComponent', () => {
       component.getInvoiceDetailPath('invoice-002'),
     ).toBe('invoices/invoice-002');
   });
+
+  it('starts on the first invoice page', () => {
+    const component = new BillingListPageComponent();
+
+    expect(component.currentPage).toBe(1);
+    expect(component.pageSize).toBe(2);
+    expect(
+      component.paginatedInvoices.map((invoice) => invoice.id),
+    ).toEqual([
+      'invoice-001',
+      'invoice-002',
+    ]);
+  });
+
+  it('moves to the next invoice page', () => {
+    const component = new BillingListPageComponent();
+
+    component.nextPage();
+
+    expect(component.currentPage).toBe(2);
+    expect(
+      component.paginatedInvoices.map((invoice) => invoice.id),
+    ).toEqual([
+      'invoice-003',
+    ]);
+  });
+
+  it('does not move past the last invoice page', () => {
+    const component = new BillingListPageComponent();
+
+    component.nextPage();
+    component.nextPage();
+
+    expect(component.currentPage).toBe(2);
+  });
+
+  it('moves back to the previous invoice page', () => {
+    const component = new BillingListPageComponent();
+
+    component.nextPage();
+    component.previousPage();
+
+    expect(component.currentPage).toBe(1);
+  });
+
+  it('does not move before the first invoice page', () => {
+    const component = new BillingListPageComponent();
+
+    component.previousPage();
+
+    expect(component.currentPage).toBe(1);
+  });
 });
