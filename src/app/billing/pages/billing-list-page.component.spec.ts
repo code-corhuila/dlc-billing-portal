@@ -131,4 +131,40 @@ describe('BillingListPageComponent', () => {
 
     expect(component.currentPage).toBe(1);
   });
+
+  it('returns to the first page when the search changes', () => {
+    const component = new BillingListPageComponent();
+
+    component.nextPage();
+
+    expect(component.currentPage).toBe(2);
+
+    component.updateSearchTerm('INV-002');
+
+    expect(component.currentPage).toBe(1);
+    expect(component.searchTerm).toBe('INV-002');
+    expect(
+      component.paginatedInvoices.map((invoice) => invoice.id),
+    ).toEqual([
+      'invoice-002',
+    ]);
+  });
+
+  it('returns to the first page when the status filter changes', () => {
+    const component = new BillingListPageComponent();
+
+    component.nextPage();
+
+    expect(component.currentPage).toBe(2);
+
+    component.updateSelectedStatus('ISSUED');
+
+    expect(component.currentPage).toBe(1);
+    expect(component.selectedStatus).toBe('ISSUED');
+    expect(
+      component.paginatedInvoices.map((invoice) => invoice.id),
+    ).toEqual([
+      'invoice-002',
+    ]);
+  });
 });
