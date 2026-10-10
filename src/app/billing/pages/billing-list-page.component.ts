@@ -7,6 +7,10 @@ type BillingInvoiceStatus =
   | 'PAID'
   | 'CANCELLED';
 
+type BillingInvoiceStatusFilter =
+  | 'ALL'
+  | BillingInvoiceStatus;
+
 interface BillingInvoiceListItem {
   id: string;
   number: string;
@@ -33,6 +37,7 @@ interface BillingInvoiceListItem {
       <section aria-label="Resumen de facturación">
         <article>
           <p>Ingresos del mes</p>
+
           <strong>
             COP
             {{ monthlyIncome.toLocaleString('es-CO') }}
@@ -41,12 +46,18 @@ interface BillingInvoiceListItem {
 
         <article>
           <p>Facturas pendientes</p>
-          <strong>{{ pendingInvoices }}</strong>
+
+          <strong>
+            {{ pendingInvoices }}
+          </strong>
         </article>
 
         <article>
           <p>Facturas pagadas</p>
-          <strong>{{ paidInvoices }}</strong>
+
+          <strong>
+            {{ paidInvoices }}
+          </strong>
         </article>
       </section>
 
@@ -55,33 +66,98 @@ interface BillingInvoiceListItem {
           Facturas
         </h2>
 
-        <table>
-          <thead>
-            <tr>
-              <th>Factura</th>
-              <th>Paciente</th>
-              <th>Valor</th>
-              <th>Estado</th>
-            </tr>
-          </thead>
+        <div>
+          <label for="invoice-search">
+            Buscar factura
+          </label>
 
-          <tbody>
-            @for (
-              invoice of invoices;
-              track invoice.id
-            ) {
+          <input
+            #searchInput
+            id="invoice-search"
+            type="search"
+            placeholder="Factura o paciente"
+            [value]="searchTerm"
+            (input)="searchTerm = searchInput.value"
+          />
+
+          <label for="invoice-status">
+            Estado
+          </label>
+
+          <select
+            #statusSelect
+            id="invoice-status"
+            [value]="selectedStatus"
+            (change)="updateSelectedStatus(statusSelect.value)"
+          >
+            <option value="ALL">
+              Todos
+            </option>
+
+            <option value="DRAFT">
+              Borrador
+            </option>
+
+            <option value="ISSUED">
+              Emitida
+            </option>
+
+            <option value="PARTIAL">
+              Pago parcial
+            </option>
+
+            <option value="PAID">
+              Pagada
+            </option>
+
+            <option value="CANCELLED">
+              Cancelada
+            </option>
+          </select>
+        </div>
+
+        @if (filteredInvoices.length === 0) {
+          <p>
+            No se encontraron facturas con los filtros seleccionados.
+          </p>
+        } @else {
+          <table>
+            <thead>
               <tr>
-                <td>{{ invoice.number }}</td>
-                <td>{{ invoice.patientName }}</td>
-                <td>
-                  COP
-                  {{ invoice.amount.toLocaleString('es-CO') }}
-                </td>
-                <td>{{ invoice.status }}</td>
+                <th>Factura</th>
+                <th>Paciente</th>
+                <th>Valor</th>
+                <th>Estado</th>
               </tr>
-            }
-          </tbody>
-        </table>
+            </thead>
+
+            <tbody>
+              @for (
+                invoice of filteredInvoices;
+                track invoice.id
+              ) {
+                <tr>
+                  <td>
+                    {{ invoice.number }}
+                  </td>
+
+                  <td>
+                    {{ invoice.patientName }}
+                  </td>
+
+                  <td>
+                    COP
+                    {{ invoice.amount.toLocaleString('es-CO') }}
+                  </td>
+
+                  <td>
+                    {{ invoice.status }}
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        }
       </section>
     </main>
   `,
@@ -90,6 +166,9 @@ export class BillingListPageComponent {
   readonly monthlyIncome = 250000;
   readonly pendingInvoices = 2;
   readonly paidInvoices = 1;
+
+  searchTerm = '';
+  selectedStatus: BillingInvoiceStatusFilter = 'ALL';
 
   readonly invoices: BillingInvoiceListItem[] = [
     {
@@ -114,4 +193,48 @@ export class BillingListPageComponent {
       status: 'PAID',
     },
   ];
+
+  get filteredInvoices(): BillingInvoiceListItem[] {
+    const normalizedSearchTerm =
+      this.searchTerm
+        .trim()
+        .toLocaleLowerCase('es-CO');
+
+    return this.invoices.filter((invoice) => {
+      const matchesSearch =
+        normalizedSearchTerm.length === 0 ||
+        invoice.number
+          .toLocaleLowerCase('es-CO')
+          .includes(normalizedSearchTerm) ||
+        invoice.patientName
+          .toLocaleLowerCase('es-CO')
+          .includes(normalizedSearchTerm);
+
+      const matchesStatus =
+        this.selectedStatus === 'ALL' ||
+        invoice.status === this.selectedStatus;
+
+      return matchesSearch && matchesStatus;
+    });
+  }
+
+  updateSelectedStatus(value: string): void {
+    const allowedStatuses: BillingInvoiceStatusFilter[] = [
+      'ALL',
+      'DRAFT',
+      'ISSUED',
+      'PARTIAL',
+      'PAID',
+      'CANCELLED',
+    ];
+
+    if (
+      allowedStatuses.includes(
+        value as BillingInvoiceStatusFilter,
+      )
+    ) {
+      this.selectedStatus =
+        value as BillingInvoiceStatusFilter;
+    }
+  }
 }
