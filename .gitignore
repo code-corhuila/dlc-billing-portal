@@ -5,3 +5,4 @@ dist/
 *.pem
 *.tsbuildinfo
 .npm-cache/
+coverage/
