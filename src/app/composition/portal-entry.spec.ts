@@ -1,6 +1,6 @@
 import '@angular/compiler';
 import { createApplication } from '@angular/platform-browser';
-import { Injector, runInInjectionContext, signal } from '@angular/core';
+import { ErrorHandler, Injector, runInInjectionContext, signal } from '@angular/core';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 vi.mock('@angular/platform-browser', () => ({ createApplication: vi.fn() }));
@@ -142,4 +142,25 @@ it('provides an unavailable frame at the root and a 404 for unknown local paths'
   expect(frame.title()).toBe('Página no encontrada');
   expect(frame.message()).toBe('La ruta solicitada no está disponible en Billing.');
   injector.destroy();
+});
+
+it('preserves cleanup rejection for the compositor after forced cancellation', async () => {
+  const handle = await mount();
+  app.destroy.mockImplementationOnce(() => { throw new Error('cleanup failed'); });
+  controller.abort();
+  await expect(handle.unmount()).rejects.toThrow('cleanup failed');
+  await expect(handle.unmount()).rejects.toThrow('cleanup failed');
+  expect(app.destroy).toHaveBeenCalledTimes(1);
+  expect(child.remove).toHaveBeenCalledTimes(1);
+});
+
+it('reports only a safe render failure code (regression)', async () => {
+  const capabilities = context();
+  const { mount } = await import('../../portal-entry');
+  await mount(host, capabilities);
+  const providers = vi.mocked(createApplication).mock.calls[0][0]!.providers!;
+  const provider = providers.find((p) => typeof p === 'object' && 'provide' in p
+    && p.provide === ErrorHandler) as { useValue: { handleError: (error: Error) => void } };
+  provider.useValue.handleError(new Error('private content'));
+  expect(capabilities.reportFailure).toHaveBeenCalledWith({ code: 'PORTAL_RENDER_FAILED' });
 });
