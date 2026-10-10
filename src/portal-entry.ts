@@ -8,7 +8,7 @@ export const contractVersion = 1;
 
 export async function mount(
   host: HTMLElement, context: PortalContext,
-): Promise<Pick<PortalHandle, 'unmount'>> {
+): Promise<PortalHandle> {
   if (context.signal.aborted) throw new Error('CANCELLED');
   const element = host.ownerDocument.createElement('dlc-billing-root');
   host.appendChild(element);
@@ -32,10 +32,17 @@ export async function mount(
       } },
     ] });
     if (context.signal.aborted) throw new Error('CANCELLED');
-    application.bootstrap(BillingCompositionRoot, element);
+    const root = application.bootstrap(BillingCompositionRoot, element).instance;
     if (context.signal.aborted) throw new Error('CANCELLED');
     context.signal.addEventListener('abort', onAbort, { once: true });
-    return { unmount };
+    return {
+      updateRoute: async (route) => {
+        if (disposed) throw new Error('CANCELLED');
+        root.route.set(route);
+      },
+      canLeave: async () => !disposed,
+      unmount,
+    };
   } catch (error) {
     try { await unmount(); } catch { /* Preserve the original mount failure. */ }
     throw error;
