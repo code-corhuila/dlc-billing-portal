@@ -3,8 +3,12 @@ import { Routes } from '@angular/router';
 export const BILLING_ROUTES: Routes = [
   {
     path: '',
-    redirectTo: 'prices',
-    pathMatch: 'full',
+    loadComponent: () =>
+      import(
+        './pages/billing-list-page.component'
+      ).then(
+        (m) => m.BillingListPageComponent,
+      ),
   },
   {
     path: 'prices',
