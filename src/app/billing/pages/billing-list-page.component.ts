@@ -1,4 +1,5 @@
 import { Component } from '@angular/core';
+import { RouterLink } from '@angular/router';
 
 type BillingInvoiceStatus =
   | 'DRAFT'
@@ -22,6 +23,7 @@ interface BillingInvoiceListItem {
 @Component({
   selector: 'dlc-billing-list-page',
   standalone: true,
+  imports: [RouterLink],
   template: `
     <main>
       <header>
@@ -128,6 +130,7 @@ interface BillingInvoiceListItem {
                 <th>Paciente</th>
                 <th>Valor</th>
                 <th>Estado</th>
+                <th>Acción</th>
               </tr>
             </thead>
 
@@ -152,6 +155,14 @@ interface BillingInvoiceListItem {
 
                   <td>
                     {{ invoice.status }}
+                  </td>
+
+                  <td>
+                    <a
+                      [routerLink]="getInvoiceDetailPath(invoice.id)"
+                    >
+                      Ver factura
+                    </a>
                   </td>
                 </tr>
               }
@@ -236,5 +247,9 @@ export class BillingListPageComponent {
       this.selectedStatus =
         value as BillingInvoiceStatusFilter;
     }
+  }
+
+  getInvoiceDetailPath(invoiceId: string): string {
+    return `invoices/${invoiceId}`;
   }
 }
