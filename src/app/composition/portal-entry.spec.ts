@@ -1,7 +1,7 @@
 import '@angular/compiler';
 import { createApplication } from '@angular/platform-browser';
-import { signal } from '@angular/core';
-import { beforeEach, expect, it, vi } from 'vitest';
+import { Injector, runInInjectionContext, signal } from '@angular/core';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 vi.mock('@angular/platform-browser', () => ({ createApplication: vi.fn() }));
 
@@ -32,6 +32,7 @@ beforeEach(() => {
   app.bootstrap.mockImplementation(() => ({ instance: root }));
   vi.mocked(createApplication).mockResolvedValue(app as never);
 });
+afterEach(() => controller.abort());
 
 it('exports the Billing v1 identity without starting an application', async () => {
   const entry = await import('../../portal-entry');
@@ -107,4 +108,38 @@ it('removes the abort listener and owned child even if destruction fails', async
   expect(child.remove).toHaveBeenCalledTimes(1);
   controller.abort();
   expect(app.destroy).toHaveBeenCalledTimes(1);
+});
+
+it('updates local routes in the same application without global navigation', async () => {
+  const capabilities = context();
+  const { mount } = await import('../../portal-entry');
+  const handle = await mount(host, capabilities);
+  const nextRoute = route('/missing');
+  await handle.updateRoute(nextRoute);
+  expect(root.route()).toEqual(nextRoute);
+  expect(createApplication).toHaveBeenCalledTimes(1);
+  expect(capabilities.navigation.request).not.toHaveBeenCalled();
+  expect(await handle.canLeave()).toBe(true);
+});
+
+it('rejects route updates and leaving after disposal', async () => {
+  const handle = await mount();
+  await handle.unmount();
+  await expect(handle.updateRoute(route('/missing'))).rejects.toThrow('CANCELLED');
+  expect(await handle.canLeave()).toBe(false);
+});
+
+it('provides an unavailable frame at the root and a 404 for unknown local paths', async () => {
+  const { BILLING_CONTEXT, BillingCompositionRoot } =
+    await import('./billing-root.component');
+  const injector = Injector.create({
+    providers: [{ provide: BILLING_CONTEXT, useValue: context() }],
+  });
+  const frame = runInInjectionContext(injector, () => new BillingCompositionRoot());
+  expect(frame.title()).toBe('Facturación');
+  expect(frame.message()).toBe('La integración de Billing no está disponible.');
+  frame.route.set(route('/missing'));
+  expect(frame.title()).toBe('Página no encontrada');
+  expect(frame.message()).toBe('La ruta solicitada no está disponible en Billing.');
+  injector.destroy();
 });
