@@ -69,4 +69,12 @@ describe('BillingListPageComponent', () => {
 
     expect(component.filteredInvoices.length).toBe(3);
   });
+
+  it('builds the feature-relative invoice detail path', () => {
+    const component = new BillingListPageComponent();
+
+    expect(
+      component.getInvoiceDetailPath('invoice-002'),
+    ).toBe('invoices/invoice-002');
+  });
 });
