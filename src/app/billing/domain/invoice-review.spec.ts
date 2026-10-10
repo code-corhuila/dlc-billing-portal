@@ -52,6 +52,48 @@ describe('invoice review rules', () => {
     expect(issueInvoice(status, chargeAmounts)).toBe('ISSUED');
   });
 
+  it('prevents issuance when a required approval is still pending', () => {
+    const status: InvoiceStatus = 'DRAFT';
+    const chargeAmounts = [80000, 30000];
+    const hasPendingApproval = true;
+
+    expect(
+      canIssueInvoice(
+        status,
+        chargeAmounts,
+        hasPendingApproval,
+      ),
+    ).toBe(false);
+  });
+
+  it('keeps the invoice in draft when a required approval is still pending', () => {
+    const status: InvoiceStatus = 'DRAFT';
+    const chargeAmounts = [80000, 30000];
+    const hasPendingApproval = true;
+
+    expect(
+      issueInvoice(
+        status,
+        chargeAmounts,
+        hasPendingApproval,
+      ),
+    ).toBe('DRAFT');
+  });
+
+  it('allows issuance when there are no pending approvals', () => {
+    const status: InvoiceStatus = 'DRAFT';
+    const chargeAmounts = [80000, 30000];
+    const hasPendingApproval = false;
+
+    expect(
+      canIssueInvoice(
+        status,
+        chargeAmounts,
+        hasPendingApproval,
+      ),
+    ).toBe(true);
+  });
+
   it('calculates the invoice total from its charge amounts', () => {
     const chargeAmounts = [80000, 20000, 30000];
 
