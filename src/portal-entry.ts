@@ -14,14 +14,18 @@ export async function mount(
   host.appendChild(element);
   let application: ApplicationRef | undefined;
   let disposed = false;
-  const unmount = async () => {
-    if (disposed) return;
+  let cleanup: Promise<void> | undefined;
+  const unmount = () => {
+    if (cleanup) return cleanup;
     disposed = true;
     context.signal.removeEventListener('abort', onAbort);
-    try { application?.destroy(); } finally { element.remove(); }
+    cleanup = Promise.resolve().then(() => {
+      try { application?.destroy(); } finally { element.remove(); }
+    });
+    return cleanup;
   };
   const onAbort = () => {
-    void unmount().catch(() => context.reportFailure({ code: 'PORTAL_TASK_FAILED' }));
+    void unmount().catch(() => { /* The handle retains rejection for the compositor. */ });
   };
   try {
     application = await createApplication({ providers: [
