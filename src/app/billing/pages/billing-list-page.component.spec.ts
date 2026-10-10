@@ -1,3 +1,5 @@
+import '@angular/compiler';
+
 import {
   describe,
   expect,
