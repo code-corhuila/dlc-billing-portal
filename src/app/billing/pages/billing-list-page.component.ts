@@ -79,7 +79,7 @@ interface BillingInvoiceListItem {
             type="search"
             placeholder="Factura o paciente"
             [value]="searchTerm"
-            (input)="searchTerm = searchInput.value"
+            (input)="updateSearchTerm(searchInput.value)"
           />
 
           <label for="invoice-status">
@@ -273,6 +273,11 @@ export class BillingListPageComponent {
     );
   }
 
+  updateSearchTerm(value: string): void {
+    this.searchTerm = value;
+    this.currentPage = 1;
+  }
+
   updateSelectedStatus(value: string): void {
     const allowedStatuses: BillingInvoiceStatusFilter[] = [
       'ALL',
@@ -290,6 +295,8 @@ export class BillingListPageComponent {
     ) {
       this.selectedStatus =
         value as BillingInvoiceStatusFilter;
+
+      this.currentPage = 1;
     }
   }
 
