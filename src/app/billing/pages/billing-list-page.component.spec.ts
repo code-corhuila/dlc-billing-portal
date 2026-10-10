@@ -28,4 +28,45 @@ describe('BillingListPageComponent', () => {
       status: 'PARTIAL',
     });
   });
+
+  it('filters invoices by invoice number or patient name', () => {
+    const component = new BillingListPageComponent();
+
+    component.searchTerm = 'INV-002';
+
+    expect(component.filteredInvoices.length).toBe(1);
+    expect(component.filteredInvoices[0].number).toBe('INV-002');
+
+    component.searchTerm = 'demostración 3';
+
+    expect(component.filteredInvoices.length).toBe(1);
+    expect(component.filteredInvoices[0].id).toBe('invoice-003');
+  });
+
+  it('filters invoices by status', () => {
+    const component = new BillingListPageComponent();
+
+    component.selectedStatus = 'PAID';
+
+    expect(component.filteredInvoices.length).toBe(1);
+    expect(component.filteredInvoices[0].status).toBe('PAID');
+  });
+
+  it('combines search and status filters', () => {
+    const component = new BillingListPageComponent();
+
+    component.searchTerm = 'Paciente';
+    component.selectedStatus = 'ISSUED';
+
+    expect(component.filteredInvoices.length).toBe(1);
+    expect(component.filteredInvoices[0].id).toBe('invoice-002');
+  });
+
+  it('shows all invoices when no status filter is selected', () => {
+    const component = new BillingListPageComponent();
+
+    component.selectedStatus = 'ALL';
+
+    expect(component.filteredInvoices.length).toBe(3);
+  });
 });
