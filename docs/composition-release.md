@@ -17,9 +17,15 @@ module and bundles its framework. There are no import maps or shared runtimes.
 The entry is inert on import and is renamed from main.js after compilation.
 Builds reject any existing release directory, including local unpublished ones.
 Use a new `BILLING_RELEASE` for each build and retain referenced releases.
-Exclusive directory creation prevents a destination created during compilation
-from being overwritten. A failed copy can leave an incomplete directory; do not
-publish it. Deployment must also prevent replacing previously published assets.
+An exclusive build lock serializes these scripts, including Angular compilation.
+Assets are copied and entry.js prepared in a private staging directory on the same
+filesystem, then renamed into the final release directory only on success.
+Handled failures remove owned staging/lock resources and allow retrying the release.
+Deployment must also prevent replacing previously published assets independently.
+Abrupt process termination can leave `.build-lock` and `.staging-*` directories.
+Before manual recovery, confirm no build is running; remove only the abandoned
+lock/staging directories, never retained release directories. No automatic stale-lock
+recovery or coordination with external publishers is claimed.
 In PowerShell, set `$env:BILLING_RELEASE = '0.1.1-demo'` before building a new version.
 The Node static service is a local development preview, not a production server.
 It accepts GET/HEAD, sends no-store and returns real 404 responses for missing files,
@@ -88,3 +94,27 @@ Follow-up verification: 89 tests passed across nine files; source coverage remai
 `0.1.0-safety-eb96816c2af34c1fa819513b1102e9fe`.
 The full suite also compiled and audited a fresh browser ESM artifact.
 Docker execution, shell integration, CI verification and independent review remain pending.
+
+## Atomic publication and coverage follow-up
+
+Base: develop `c7d6f57`; branch `fix/hu-bil-002-atomic-release`.
+Suggested Conventional Commits PR title: `fix: publish billing releases atomically and enforce coverage`.
+
+| Criterion | RED evidence | GREEN evidence |
+|---|---|---|
+| Complete publication, failure cleanup, retry and build exclusion | `14e4fbe`: suite could not load the missing publication module | `40d7869`: six publication tests and six actual bundle tests passed |
+| Safe server-side diagnosis of 500 responses | `4198a6e`: expected diagnostic was not emitted | `18f6ec8`: eight HTTP tests passed; diagnostic includes event, error code and relative asset, excluding query/body/error message |
+| At least 80% source coverage in all four metrics | `c495d06`: 96 tests passed but all four coverage thresholds failed | `9192169`: 113 tests passed across 11 files; all thresholds passed |
+
+Catalog tests are regression tests of existing dummy behavior, not new domain behavior
+or simulated TDD failures. They cover search, invalid forms, pending submissions,
+version history, fixture isolation, simulated empty/error states and restoration.
+They instantiate component classes; DOM accessibility and backend integration are not proven.
+Coverage include/exclude rules are unchanged; scripts remain outside the source metric.
+
+Final source coverage: lines **92.91%**, statements **92.68%**, branches **92.39%**,
+functions **89.10%**. Current domain utilities retain 100% coverage.
+Both `npm run build` and `npm run build:portal` passed; the latter published fresh
+release `0.1.0-atomic-ca7cd8826ccc43719fa9c649b4fcb079`.
+`docker compose -f deploy/compose.yml config` and `git diff --check` passed.
+Docker image/runtime, CI and independent review still require verification.
