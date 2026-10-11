@@ -3,15 +3,16 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import type { AddressInfo } from 'node:net';
 import { expect, it } from 'vitest';
+import { readFile } from 'node:fs/promises';
 
-async function withServer(check: (origin: string) => Promise<void>) {
+async function withServer(check: (origin: string) => Promise<void>, readAsset = readFile) {
   const { createPortalServer } = await import('./serve-portal.mjs');
   const parent = resolve(tmpdir());
   const root = mkdtempSync(join(parent, 'billing-static-'));
   mkdirSync(join(root, '0.1.0-demo'));
   writeFileSync(join(root, '0.1.0-demo/entry.js'), 'export const portalId = "billing";');
   writeFileSync(join(root, '0.1.0-demo/entry.css'), '.bil-frame { color: teal; }');
-  const server = createPortalServer(root);
+  const server = createPortalServer(root, readAsset);
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   const port = (server.address() as AddressInfo).port;
   try { await check(`http://127.0.0.1:${port}`); } finally {
@@ -59,6 +60,24 @@ it('rejects writes to the static service', async () => {
     const response = await fetch(`${origin}/portals/billing/0.1.0-demo/entry.js`, { method: 'POST' });
     expect(response.status).toBe(405);
     expect(response.headers.get('allow')).toBe('GET, HEAD');
+    await response.text();
+  });
+});
+
+it.each(['EACCES', 'EIO'])('reports %s as a server failure without exposing details', async (code) => {
+  const failingRead = async () => { throw Object.assign(new Error('private disk details'), { code }); };
+  await withServer(async (origin) => {
+    const response = await fetch(`${origin}/portals/billing/0.1.0-demo/entry.js`);
+    expect(response.status).toBe(500);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(await response.text()).not.toContain('private disk details');
+  }, failingRead as typeof readFile);
+});
+
+it('rejects malformed URL encoding as a bad request', async () => {
+  await withServer(async (origin) => {
+    const response = await fetch(`${origin}/portals/billing/%ZZ`);
+    expect(response.status).toBe(400);
     await response.text();
   });
 });
