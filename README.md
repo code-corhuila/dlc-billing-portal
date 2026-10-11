@@ -71,5 +71,7 @@ npm start
 
 ## Composition v1 release
 
-Build with `npm run build:portal` and serve with `npm run serve:portal`.
+Build with `npm run build:portal` and preview locally with `npm run serve:portal`.
+The Node preview server is for development only; production packaging uses Nginx.
+Each build requires a new release directory; set `BILLING_RELEASE` when rebuilding.
 See [release instructions and evidence](docs/composition-release.md).
