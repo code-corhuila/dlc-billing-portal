@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import { resolve } from 'node:path';
 import { expect, it } from 'vitest';
 
@@ -10,8 +11,9 @@ const run = (release: string) => execFileSync(process.execPath, [script], {
 });
 
 it('builds a self-contained, inert composition-v1 browser release', () => {
-  run('0.1.0-test');
-  const entry = resolve('dist/portals/billing/0.1.0-test/entry.js');
+  const release = `test-${randomUUID()}`;
+  run(release);
+  const entry = resolve('dist/portals/billing', release, 'entry.js');
   const audit = `
     import assert from 'node:assert/strict';
     import { readFileSync } from 'node:fs';
@@ -57,4 +59,16 @@ it.each(['../escape', '.', 'a/b', 'demo?x=1'])('rejects unsafe release %s', (rel
     return;
   }
   throw new Error('Unsafe release accepted');
+});
+
+it('rejects an existing release without changing its files', () => {
+  const release = `test-${randomUUID()}`;
+  const target = resolve('dist/portals/billing', release);
+  mkdirSync(target, { recursive: true });
+  writeFileSync(resolve(target, 'entry.js'), 'retained published artifact');
+  for (let attempt = 0; attempt < 2; attempt++) {
+    expect(() => run(release)).toThrow(/Billing release already exists/);
+    expect(readFileSync(resolve(target, 'entry.js'), 'utf8')).toBe('retained published artifact');
+    expect(readdirSync(target)).toEqual(['entry.js']);
+  }
 });
