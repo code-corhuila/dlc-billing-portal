@@ -24,3 +24,4 @@ jobs:
           path: coverage/
           if-no-files-found: warn
       - run: npm run build
+      - run: npm run build:portal

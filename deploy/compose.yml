@@ -1,0 +1,8 @@
+name: dlc-billing-portal
+services:
+  billing-portal-demo:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    ports:
+      - "${BILLING_PORT:-4204}:80"

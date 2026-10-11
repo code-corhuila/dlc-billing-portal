@@ -67,3 +67,9 @@ Data is reset when the application is reloaded.
 ```bash
 npm install
 npm start
+```
+
+## Composition v1 release
+
+Build with `npm run build:portal` and serve with `npm run serve:portal`.
+See [release instructions and evidence](docs/composition-release.md).
