@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "build": "ng build",
+    "build:portal": "node scripts/build-portal.mjs",
     "start": "ng run dlc-billing-portal:serve-original",
     "start:federation": "ng serve",
     "test": "vitest run",

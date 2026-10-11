@@ -5,7 +5,7 @@ import { expect, it } from 'vitest';
 
 const script = resolve('scripts/build-portal.mjs');
 const run = (release: string) => execFileSync(process.execPath, [script], {
-  encoding: 'utf8', timeout: 120000,
+  encoding: 'utf8', timeout: 120000, stdio: 'pipe',
   env: { ...process.env, BILLING_RELEASE: release },
 });
 
@@ -17,9 +17,10 @@ it('builds a self-contained, inert composition-v1 browser release', () => {
     import { readFileSync } from 'node:fs';
     import { SourceTextModule, createContext } from 'node:vm';
     import { pathToFileURL } from 'node:url';
+    import { performance } from 'node:perf_hooks';
     const forbidden = () => { throw new Error('Import side effect'); };
     const context = createContext({
-      document: { createElement: forbidden, addEventListener: forbidden },
+      performance, document: { createElement: forbidden, addEventListener: forbidden },
       fetch: forbidden, XMLHttpRequest: forbidden, addEventListener: forbidden,
       setTimeout: forbidden, setInterval: forbidden,
       history: { pushState: forbidden, replaceState: forbidden },
