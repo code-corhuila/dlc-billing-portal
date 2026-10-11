@@ -9,6 +9,20 @@
       "sourceRoot": "src",
       "prefix": "dlc",
       "architect": {
+        "build-portal": {
+          "builder": "@angular/build:application",
+          "options": {
+            "browser": "src/portal-entry.ts",
+            "tsConfig": "tsconfig.app.json",
+            "outputPath": { "base": "dist/billing-composition", "browser": "" },
+            "index": false,
+            "polyfills": [],
+            "assets": [],
+            "styles": [],
+            "optimization": true,
+            "outputHashing": "none"
+          }
+        },
         "build": {
           "builder": "@angular-architects/native-federation:build",
           "options": {
