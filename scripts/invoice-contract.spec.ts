@@ -11,7 +11,7 @@ const snapshot = {
 it('keeps the checked-in projection aligned with generated frontend constraints (regression)', async () => {
   const { verifyContract } = await import('./invoice-contract.mjs');
   const approved = JSON.parse(readFileSync('contracts/invoice-list.snapshot.json', 'utf8'));
-  expect(() => verifyContract(approved, 'src/app/billing/model/invoice-contract.generated.ts')).not.toThrow();
+  expect(() => verifyContract(approved, 'src/app/billing/model/generated/invoice-contract.generated.ts')).not.toThrow();
 });
 it('generates status types and money constraints from the reviewed projection', async () => {
   const { renderContract } = await import('./invoice-contract.mjs');
@@ -31,6 +31,8 @@ it('detects status or money changes instead of silently retaining generated type
     expect(() => verifyContract({ ...snapshot, status: { type: 'string', enum: ['DRAFT'] } }, file)).toThrow(/drift/);
     expect(() => verifyContract({ ...snapshot, money: { type: 'string', pattern: '^\\d+\\.\\d{3}$' } }, file)).toThrow(/drift/);
     expect(readFileSync(file, 'utf8')).toBe(renderContract(snapshot));
+    writeFileSync(file, readFileSync(file, 'utf8').replace('"PAID"', '"SETTLED"'));
+    expect(() => verifyContract(snapshot, file)).toThrow(/drift/);
   } finally {
     expect(dirname(root)).toBe(tmpdir());
     rmSync(root, { recursive: true });

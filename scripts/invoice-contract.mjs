@@ -30,7 +30,7 @@ function readProjection(docs) {
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const root = fileURLToPath(new URL('../', import.meta.url));
   const snapshotFile = join(root, 'contracts/invoice-list.snapshot.json');
-  const target = join(root, 'src/app/billing/model/invoice-contract.generated.ts');
+  const target = join(root, 'src/app/billing/model/generated/invoice-contract.generated.ts');
   const [mode, docs, revision] = process.argv.slice(2);
   if (mode === '--refresh' && docs && revision) {
     const snapshot = { revision, ...readProjection(docs) };

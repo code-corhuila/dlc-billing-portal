@@ -3,7 +3,7 @@ import { RouterLink } from '@angular/router';
 import type { InvoiceListItem, InvoiceListStatus } from '../model/invoice-list-item';
 import { copMoney } from '../model/cop-money';
 import { formatCopMoney } from '../presentation/format-cop-money';
-import { INVOICE_STATUSES } from '../model/invoice-contract.generated';
+import { INVOICE_STATUSES } from '../model/generated/invoice-contract.generated';
 type BillingInvoiceStatusFilter = 'ALL' | InvoiceListStatus;
 
 @Component({

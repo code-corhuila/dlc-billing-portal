@@ -1,4 +1,4 @@
-import { COP_MONEY_PATTERN } from './invoice-contract.generated';
+import { COP_MONEY_PATTERN } from './generated/invoice-contract.generated';
 
 // Contract representation only; financial business rules remain owner-controlled.
 export type CopMoney = string & { readonly copMoney: unique symbol };

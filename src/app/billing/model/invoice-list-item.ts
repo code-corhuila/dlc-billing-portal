@@ -1,5 +1,5 @@
 import type { CopMoney } from './cop-money';
-import type { InvoiceStatus } from './invoice-contract.generated';
+import type { InvoiceStatus } from './generated/invoice-contract.generated';
 
 export type InvoiceListStatus = InvoiceStatus;
 // Presentation projection, not the owner Invoice DTO; patient labels are fictional.
