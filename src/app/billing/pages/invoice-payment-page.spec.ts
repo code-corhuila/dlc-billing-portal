@@ -1,6 +1,6 @@
 import '@angular/compiler';
 import { Injector, runInInjectionContext } from '@angular/core';
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import { InvoicePaymentPageComponent } from './invoice-payment-page.component';
 import { DemoInvoicePayments } from '../data/demo-invoice-payments';
 import { dummyInvoiceList } from '../data/invoice-list.dummy';
@@ -17,6 +17,21 @@ it('registers a payable invoice once, clears the form and displays local history
     expect(page.history).toHaveLength(1); expect(page.dirty).toBe(false);
     page.amount = '0.01'; page.method = 'demo'; page.submit();
     expect(page.invoice?.status).toBe('PAID'); expect(page.history).toHaveLength(2);
+  } finally { injector.destroy(); }
+});
+
+it('retains the same intent for explicit retry and changes it when the draft changes', () => {
+  const injector = Injector.create({ providers: [] });
+  try {
+    const page = runInInjectionContext(injector, () => new InvoicePaymentPageComponent());
+    const ledger = new DemoInvoicePayments(dummyInvoiceList);
+    const register = vi.fn(() => { throw new Error('Demo failure'); });
+    page.session = { read: () => ledger.read(), detail: id => ledger.detail(id), history: id => ledger.history(id), register };
+    page.invoiceId = 'invoice-001'; page.canPay = true; page.amount = '1.00'; page.method = 'demo';
+    page.submit(); page.submit();
+    expect(register.mock.calls[0][3]).toBe(register.mock.calls[1][3]);
+    page.amount = '2.00'; page.submit();
+    expect(register.mock.calls[2][3]).not.toBe(register.mock.calls[0][3]);
   } finally { injector.destroy(); }
 });
 
