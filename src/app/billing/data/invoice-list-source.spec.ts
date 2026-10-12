@@ -10,7 +10,8 @@ it('uses one configured source for composed and standalone invoice rows', async 
   const rows = [{ ...dummyInvoiceList.read()[0], id: 'replacement-demo' }];
   const source = { read: vi.fn(() => rows.map(row => ({ ...row }))), detail: vi.fn() };
   const injector = Injector.create({ providers: [provideInvoiceListSource(source), {
-    provide: BILLING_CONTEXT, useValue: { route: { localPath: '/' }, signal: new AbortController().signal },
+    provide: BILLING_CONTEXT, useValue: { route: { localPath: '/' }, signal: new AbortController().signal,
+      session: { getSnapshot: vi.fn(), subscribe: () => () => {} } },
   }] });
   try {
     const frame = runInInjectionContext(injector, () => new BillingCompositionRoot());

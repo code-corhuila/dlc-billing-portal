@@ -24,7 +24,7 @@
         Reglas adicionales
       </a> }
 
-      <button type="button" class="primary-button" (click)="openForm()">
+      <button type="button" class="primary-button" [disabled]="!canManagePrices || submitting()" (click)="openForm()">
         + Nuevo precio
       </button>
 
@@ -304,7 +304,7 @@
 
 
           <button type="submit" class="primary-button" [disabled]="
-                priceForm.invalid ||
+                !canManagePrices || priceForm.invalid ||
                 !validAmount ||
                 submitting()
               ">

@@ -9,7 +9,8 @@ import { PricingCatalogService } from '../billing/catalog/services/pricing-catal
 it('selects only the approved procedures route and guards an open catalog form', () => {
   const injector = Injector.create({ providers: [provideInvoiceListSource(),
     { provide: PricingCatalogService, useValue: new PricingCatalogService() },
-    { provide: BILLING_CONTEXT, useValue: { route: { localPath: '/procedures' } } }] });
+    { provide: BILLING_CONTEXT, useValue: { route: { localPath: '/procedures' },
+      session: { getSnapshot: vi.fn(), subscribe: () => () => {} } } }] });
   try {
     const frame = runInInjectionContext(injector, () => new BillingCompositionRoot());
     const page = runInInjectionContext(injector, () => new PricingCatalogComponent());

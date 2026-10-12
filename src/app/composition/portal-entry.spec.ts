@@ -21,7 +21,7 @@ const context = () => ({
   contractVersion: 1 as const, portalId: 'billing' as const,
   mountId: 'mount-1', compositionId: 'composition-1', route: route(),
   signal: controller.signal, navigation: { request: vi.fn() },
-  session: { getSnapshot: vi.fn(), subscribe: vi.fn() },
+  session: { getSnapshot: vi.fn(), subscribe: vi.fn(() => () => {}) },
   http: { request: vi.fn() }, reportFailure: vi.fn(),
 });
 const mount = async () => (await import('../../portal-entry')).mount(host, context());

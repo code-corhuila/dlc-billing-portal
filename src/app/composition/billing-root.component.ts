@@ -16,7 +16,7 @@ export const BILLING_CONTEXT = new InjectionToken<PortalContext>('billing.contex
   } @else if (isInvoiceDetail()) {
     <dlc-invoice-detail-page [invoice]="selectedInvoice()" (back)="backToList()" />
   } @else if (isProcedures()) {
-    <dlc-pricing-catalog [composed]="true" />
+    <dlc-pricing-catalog [composed]="true" [canManagePrices]="canManagePrices()" />
   } @else {
     <section aria-label="Billing"><h1 tabindex="-1">{{ title() }}</h1>
       <p role="status">{{ message() }}</p></section>
@@ -28,6 +28,14 @@ export class BillingCompositionRoot {
   private navigationGeneration = 0;
   private pendingInvoice?: string;
   private readonly source = inject(INVOICE_LIST_SOURCE);
+  readonly session = signal(this.context.session.getSnapshot());
+  readonly canManagePrices = computed(() => this.session()?.state === 'authenticated'
+    && this.session()?.user?.roles.includes('ADMINISTRATOR') === true);
+  constructor() {
+    this.destroyRef.onDestroy(this.context.session.subscribe(snapshot => {
+      if (!this.isInactive()) this.session.set(snapshot);
+    }));
+  }
   readonly route = signal(this.context.route);
   readonly invoices = this.source.read();
   readonly isInvoiceList = computed(() => this.route().localPath === '/');

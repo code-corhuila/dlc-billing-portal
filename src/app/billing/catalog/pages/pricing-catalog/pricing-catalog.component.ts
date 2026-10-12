@@ -24,6 +24,7 @@ import { PricingCatalogService } from '../../services/pricing-catalog.service';
 })
 export class PricingCatalogComponent {
   @Input() composed = false;
+  @Input() canManagePrices = true;
   private readonly pricingCatalogService =
     inject(PricingCatalogService);
 
@@ -53,6 +54,7 @@ export class PricingCatalogComponent {
   }
 
   openForm(): void {
+    if (!this.canManagePrices || this.submitting()) return;
     this.clearMessages();
     this.resetForm();
     this.formVisible.set(true);
@@ -67,7 +69,7 @@ export class PricingCatalogComponent {
   }
 
   submitPrice(): void {
-    if (this.destroyRef.destroyed || this.submitting() || !this.isFormValid()) {
+    if (!this.canManagePrices || this.destroyRef.destroyed || this.submitting() || !this.isFormValid()) {
       return;
     }
 
@@ -76,6 +78,7 @@ export class PricingCatalogComponent {
 
     this.pendingTimer = setTimeout(() => {
       if (this.destroyRef.destroyed) return;
+      if (!this.canManagePrices) { this.submitting.set(false); return; }
       const updatedPrices =
         this.pricingCatalogService.createNewVersion(
           this.prices(),
