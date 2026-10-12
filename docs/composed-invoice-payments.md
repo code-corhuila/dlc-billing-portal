@@ -9,6 +9,7 @@ Owner clarification for this demo: the first payment must cover at least 50% of 
 invoice total including extras, rounded upward to a cent. Subsequent positive payments
 may settle the remaining balance. This extends the demo policy; the owner API contract
 does not yet specify that minimum and must be aligned before real integration.
+Initial snapshots predate the policy; previously recorded amounts are not rewritten.
 
 HU-BIL-003, Billing OpenAPI payment operation/API-FIN-01, and monetary-calculation.md
 require positive exact COP payments not above balance, payable ISSUED/PARTIALLY_PAID
@@ -35,15 +36,17 @@ The legacy standalone numeric payment screen is unchanged and is not the compose
 | Stable draft key for explicit retry | 87a2111: 1 expected failure | cfc479e: 6 targeted tests passed | Passed |
 | Focus after successful submission | a1da6d6: 1 expected failure | 4f1454b: 3 targeted tests passed | Passed |
 | Paid/payable counters follow current rows | 0b14d27: 1 expected failure | 0ed60db: 19 targeted tests passed | Passed |
+| First payment >= 50% of invoice total; subsequent payments and cent rounding | fd4021a: 2 expected failures across targeted runs | cbbeab6: 7 targeted tests passed | Passed |
 
-178 tests passed in 23 files. Coverage: lines 94.58%, statements 94.32%, branches 95.47%,
-functions 92.99%; thresholds/exclusions unchanged. Both final builds passed. Release
+179 tests passed in 23 files. Coverage: lines 94.63%, statements 94.37%, branches 95.55%,
+functions 93.03%; thresholds/exclusions unchanged. Both final builds passed. Release
 publication initially failed with EPERM on staging rename; target/lock were absent and
 an explicit retry succeeded. No published artifact was replaced.
 Local browser QA used a disposable dlc-front build and synthetic Administrator. Verified
 list -> detail -> payment, dirty-form guard, COP 0.01 partial payment, exact remaining
 COP 99999.99, final PAID/zero balance, two session history rows and heading focus.
 The final counter release confirmed one payable and two paid rows after paying INV-001.
+Minimum QA: INV-002 rejected COP 59999.99, accepted COP 60000.00 and showed the subsequent COP 0.01 minimum; `.npm-cache/minimum-deposit-proof.png`.
 Ignored screenshots: `.npm-cache/composed-payments-proof.png` and
 `.npm-cache/composed-payment-counters-proof.png`. Monthly income remains a fixed demo metric.
 Backend responses, full accessibility certification, container runtime and official HU
