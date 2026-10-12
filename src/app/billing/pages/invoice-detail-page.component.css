@@ -1,0 +1,14 @@
+:host { display: block; color: #1f2933; font: 14px/1.5 Inter, system-ui, sans-serif; }
+section { padding: 24px; background: #f7f9fa; }
+h1 { font-size: 24px; line-height: 1.25; }
+h2 { font-size: 18px; }
+article { padding: 16px; background: white; border: 1px solid #d6dee2; border-radius: 12px; }
+button { font: inherit; padding: 8px 12px; background: #0f766e; color: white; border: 0; border-radius: 8px; cursor: pointer; }
+:is(button, .table-scroll):focus-visible { outline: 3px solid #1554a3; outline-offset: 3px; }
+.table-scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; min-width: 360px; font-variant-numeric: tabular-nums; }
+caption { text-align: left; padding: 8px 0; }
+th, td { padding: 12px; border-bottom: 1px solid #d6dee2; text-align: left; }
+th { background: #eef2f4; }
+.total { font-size: 18px; font-variant-numeric: tabular-nums; }
+@media (max-width: 720px) { section { padding: 16px; } }
