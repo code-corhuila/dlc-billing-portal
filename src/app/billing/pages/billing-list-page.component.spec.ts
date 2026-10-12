@@ -33,7 +33,7 @@ describe('BillingListPageComponent', () => {
   });
   it('exposes the billing summary metrics', () => {
 
-    expect(component.monthlyIncome).toBe(250000);
+    expect(component.monthlyIncome).toBe('250000.00');
     expect(component.pendingInvoices).toBe(2);
     expect(component.paidInvoices).toBe(1);
   });
@@ -46,7 +46,7 @@ describe('BillingListPageComponent', () => {
       id: 'invoice-001',
       number: 'INV-001',
       patientName: 'Paciente de demostración',
-      amount: 130000,
+      amount: '130000.00',
       status: 'PARTIALLY_PAID',
     });
   });
@@ -58,7 +58,7 @@ describe('BillingListPageComponent', () => {
     component.invoices[0].amount = 1;
     const other = new BillingListPageComponent();
     other.invoices = dummyInvoiceList.read();
-    expect(other.invoices[0].amount).toBe(130000);
+    expect(other.invoices[0].amount).toBe('130000.00');
   });
 
   it('filters invoices by invoice number or patient name', () => {
