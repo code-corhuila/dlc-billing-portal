@@ -9,6 +9,13 @@ import {
 import { BillingListPageComponent } from './billing-list-page.component';
 
 describe('BillingListPageComponent', () => {
+  it('emits a selected invoice for composed navigation without owning a router', () => {
+    const component = new BillingListPageComponent();
+    const selected: string[] = [];
+    component.openInvoice.subscribe(id => selected.push(id));
+    component.openInvoice.emit('invoice-002');
+    expect(selected).toEqual(['invoice-002']);
+  });
   it('exposes the billing summary metrics', () => {
     const component = new BillingListPageComponent();
 

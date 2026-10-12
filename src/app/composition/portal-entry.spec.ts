@@ -129,7 +129,7 @@ it('rejects route updates and leaving after disposal', async () => {
   expect(await handle.canLeave()).toBe(false);
 });
 
-it('provides an unavailable frame at the root and a 404 for unknown local paths', async () => {
+it('selects the dummy invoice list at the root and a 404 for unknown local paths', async () => {
   const { BILLING_CONTEXT, BillingCompositionRoot } =
     await import('./billing-root.component');
   const injector = Injector.create({
@@ -137,10 +137,33 @@ it('provides an unavailable frame at the root and a 404 for unknown local paths'
   });
   const frame = runInInjectionContext(injector, () => new BillingCompositionRoot());
   expect(frame.title()).toBe('Facturación');
-  expect(frame.message()).toBe('La integración de Billing no está disponible.');
+  expect(frame.isInvoiceList()).toBe(true);
   frame.route.set(route('/missing'));
+  expect(frame.isInvoiceList()).toBe(false);
   expect(frame.title()).toBe('Página no encontrada');
   expect(frame.message()).toBe('La ruta solicitada no está disponible en Billing.');
+  injector.destroy();
+});
+
+it('requests invoice navigation through the compositor and handles refusal or failure', async () => {
+  const { BILLING_CONTEXT, BillingCompositionRoot } = await import('./billing-root.component');
+  const capabilities = context();
+  const injector = Injector.create({ providers: [{ provide: BILLING_CONTEXT, useValue: capabilities }] });
+  const frame = runInInjectionContext(injector, () => new BillingCompositionRoot());
+  capabilities.navigation.request.mockResolvedValue({ status: 'applied' });
+  await frame.openInvoice('invoice-001');
+  expect(capabilities.navigation.request).toHaveBeenCalledWith({ path: '/app/billing/invoices/invoice-001' });
+  capabilities.navigation.request.mockResolvedValue({ status: 'cancelled' });
+  await frame.openInvoice('invoice-002');
+  expect(frame.navigationMessage()).not.toBe('');
+  capabilities.navigation.request.mockRejectedValue(new Error('private details'));
+  await frame.openInvoice('invoice-002');
+  expect(capabilities.reportFailure).toHaveBeenCalledWith({ code: 'PORTAL_TASK_FAILED' });
+  expect(frame.navigationMessage()).not.toContain('private details');
+  controller.abort();
+  capabilities.navigation.request.mockClear();
+  await frame.openInvoice('invoice-001');
+  expect(capabilities.navigation.request).not.toHaveBeenCalled();
   injector.destroy();
 });
 
