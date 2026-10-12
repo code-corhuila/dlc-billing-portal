@@ -18,6 +18,8 @@ export const dummyInvoiceList: InvoiceListSource = {
       { description: 'Procedimiento de demostración', amount: copMoney('80000.00') },
       { description: 'Material de demostración', amount: copMoney('50000.00') },
     ] : [{ description: 'Procedimiento de demostración', amount: invoice.amount }];
-    return { ...invoice, charges };
+    const paidTotal = copMoney(id === 'invoice-001' ? '30000.00' : id === 'invoice-003' ? '250000.00' : '0.00');
+    const balance = copMoney(id === 'invoice-001' ? '100000.00' : id === 'invoice-003' ? '0.00' : '120000.00');
+    return { ...invoice, charges, paidTotal, balance };
   },
 };

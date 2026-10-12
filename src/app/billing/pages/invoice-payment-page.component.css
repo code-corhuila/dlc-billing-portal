@@ -1,0 +1,10 @@
+:host { display: block; font: 14px/1.5 Inter, system-ui, sans-serif; color: #1f2933; }
+section { padding: 24px; background: #f7f9fa; }
+article { padding: 20px; background: white; border: 1px solid #d6dee2; border-radius: 12px; }
+h1 { font-size: 24px; } h2 { font-size: 18px; }
+label { display: grid; gap: 6px; margin: 12px 0; }
+input, button { font: inherit; padding: 10px; border: 1px solid #d6dee2; border-radius: 8px; }
+button { background: #0f766e; color: white; margin: 4px; cursor: pointer; }
+button:disabled { background: #eef2f4; color: #66737a; cursor: default; }
+:is(button, input):focus-visible { outline: 3px solid #1554a3; outline-offset: 3px; }
+@media (max-width: 720px) { section { padding: 16px; } }

@@ -4,17 +4,23 @@ import { BillingListPageComponent } from '../billing/pages/billing-list-page.com
 import { INVOICE_LIST_SOURCE } from '../billing/data/invoice-list-source';
 import { InvoiceDetailPageComponent } from '../billing/pages/invoice-detail-page.component';
 import { PricingCatalogComponent } from '../billing/catalog/pages/pricing-catalog/pricing-catalog.component';
+import { DemoInvoicePayments } from '../billing/data/demo-invoice-payments';
+import { InvoicePaymentPageComponent } from '../billing/pages/invoice-payment-page.component';
 
 export const BILLING_CONTEXT = new InjectionToken<PortalContext>('billing.context');
 
 @Component({
   selector: 'dlc-billing-root',
   standalone: true,
-  imports: [BillingListPageComponent, InvoiceDetailPageComponent, PricingCatalogComponent],
+  imports: [BillingListPageComponent, InvoiceDetailPageComponent, PricingCatalogComponent, InvoicePaymentPageComponent],
   template: `@if (isInvoiceList()) {
     <dlc-billing-list-page [composed]="true" [invoices]="invoices" (openInvoice)="openInvoice($event)" />
   } @else if (isInvoiceDetail()) {
-    <dlc-invoice-detail-page [invoice]="selectedInvoice()" (back)="backToList()" />
+    <dlc-invoice-detail-page [invoice]="selectedInvoice()" [canPay]="canRecordPayments()"
+      (pay)="openPayment($event)" (back)="backToList()" />
+  } @else if (isPaymentRoute()) {
+    <dlc-invoice-payment-page [session]="payments" [invoiceId]="selectedInvoice()?.id ?? ''"
+      [canPay]="canRecordPayments()" (back)="backToList()" />
   } @else if (isProcedures()) {
     <dlc-pricing-catalog [composed]="true" [canManagePrices]="canManagePrices()" />
   } @else {
@@ -37,23 +43,28 @@ export class BillingCompositionRoot {
     }));
   }
   readonly route = signal(this.context.route);
-  readonly invoices = this.source.read();
+  readonly payments = new DemoInvoicePayments(this.source);
+  get invoices() { return this.payments.read(); }
+  readonly canRecordPayments = computed(() => this.session()?.state === 'authenticated'
+    && this.session()?.user?.roles.some(role => ['ADMINISTRATOR', 'SECRETARY_ASSISTANT'].includes(role)) === true);
   readonly isInvoiceList = computed(() => this.route().localPath === '/');
   readonly isProcedures = computed(() => this.route().localPath === '/procedures');
   readonly catalog = viewChild(PricingCatalogComponent);
+  readonly paymentPage = viewChild(InvoicePaymentPageComponent);
   canLeave(): boolean {
     const page = this.catalog();
-    return !page || (!page.formVisible() && !page.submitting());
+    return (!page || (!page.formVisible() && !page.submitting())) && !this.paymentPage()?.dirty;
   }
   private readonly invoiceId = computed(() => {
-    const match = /^\/invoices\/([^/]+)$/.exec(this.route().localPath);
+    const match = /^\/invoices\/([^/]+)(\/payment)?$/.exec(this.route().localPath);
     if (!match) return undefined;
     try { return decodeURIComponent(match[1]); } catch { return undefined; }
   });
-  readonly isInvoiceDetail = computed(() => this.invoiceId() !== undefined);
+  readonly isPaymentRoute = computed(() => this.invoiceId() !== undefined && this.route().localPath.endsWith('/payment'));
+  readonly isInvoiceDetail = computed(() => this.invoiceId() !== undefined && !this.isPaymentRoute());
   readonly selectedInvoice = computed(() => {
     const id = this.invoiceId();
-    return id === undefined ? undefined : this.source.detail(id);
+    return id === undefined ? undefined : this.payments.detail(id);
   });
   readonly navigationMessage = signal('');
   readonly title = computed(() => this.route().localPath === '/'
@@ -66,6 +77,9 @@ export class BillingCompositionRoot {
   }
   async backToList(): Promise<void> {
     await this.navigate(this.route().basePath);
+  }
+  async openPayment(id: string): Promise<void> {
+    if (this.canRecordPayments()) await this.navigate(`${this.route().basePath}/invoices/${encodeURIComponent(id)}/payment`);
   }
   private async navigate(path: string): Promise<void> {
     if (this.isInactive() || this.pendingInvoice === path) return;
