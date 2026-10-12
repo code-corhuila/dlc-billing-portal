@@ -39,6 +39,17 @@ describe('BillingListPageComponent', () => {
     expect(component.paidInvoices).toBe(1);
   });
 
+  it('counts paid and payable rows after payment changes without depending on search', () => {
+    component.invoices[0].status = 'PAID';
+    component.searchTerm = 'missing';
+    expect(component.pendingInvoices).toBe(1);
+    expect(component.paidInvoices).toBe(2);
+    component.invoices = component.invoices.map(row => ({ ...row, status: 'DRAFT' }));
+    expect(component.pendingInvoices).toBe(0);
+    component.invoices = [];
+    expect(component.paidInvoices).toBe(0);
+  });
+
   it('starts with a billing invoice list', () => {
 
     expect(component.invoices.length).toBe(3);
