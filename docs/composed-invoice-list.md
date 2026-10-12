@@ -1,5 +1,7 @@
 # HU-BIL-002 composed invoice-list demo
 
+Historical evidence for the original list increment. Current source configuration and exact monetary types are described in [invoice-source-contract.md](invoice-source-contract.md).
+
 Related issue: code-corhuila/dlc-billing-portal#3; HU: code-corhuila/dlc-docs#64.
 Base: develop `1ddce33`. This is a Cut 2 fixture increment, not HU acceptance.
 Contracts: ADR-011; frontend-composition.md C02-C04; design-system.md; Billing OpenAPI GET /api/v1/invoices and PARTIALLY_PAID vocabulary.
@@ -28,7 +30,7 @@ Screenshot: ignored `.npm-cache/composed-invoice-list-proof.png`. This evidence 
 Final source-boundary check rebuilt QA release `0.1.0-input-boundary-qa-0e65faa7a4354c2a85a97f27dd734209`, then verified populated rows and search in the same disposable shell. Snapshot: ignored `.npm-cache/invoice-source-boundary-proof.png`. No real shell registry was edited.
 
 Review decisions: source selection now belongs to composition; navigation allows a different target instead of blocking all clicks. English identifiers/comments/docs are retained; existing Spanish UI is localized product copy, not a new i18n framework.
-Money debt remains explicit: move neutral contract types out of the fixture module, retain decimal strings and introduce decimal-safe formatting before owner integration.
+The list's original money debt is addressed in the source-contract follow-up; other legacy pages and the future owner adapter still require alignment.
 Pending: publish/select a retained release in the real shell, compose detail/issuance/payments and /procedures, align legacy models, implement owner HTTP loading/validation/forbidden/failure states, verify containers/CI and obtain independent acceptance.
 No API response, persistence, authorization, clinical narrative, PDF download or completed HU is claimed.
 Suggested PR title: `feat(billing): compose invoice list for cut 2 demo`.
