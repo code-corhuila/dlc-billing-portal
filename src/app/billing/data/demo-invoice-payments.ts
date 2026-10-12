@@ -3,6 +3,7 @@ import { copMoney } from '../model/cop-money';
 import type { InvoicePaymentSession, DemoPayment } from '../model/invoice-payment-session';
 import type { InvoiceListSource } from './invoice-list-source';
 import type { InvoiceDetail } from '../model/invoice-detail';
+import { minimumPayment } from '../domain/initial-payment-minimum';
 
 const cents = (amount: string) => BigInt(copMoney(amount).replace('.', ''));
 const money = (value: bigint) => copMoney(`${value / 100n}.${(value % 100n).toString().padStart(2, '0')}`);
@@ -34,11 +35,11 @@ export class DemoInvoicePayments implements InvoicePaymentSession {
     }
     const invoice = this.detail(id);
     if (!invoice || !['ISSUED', 'PARTIALLY_PAID'].includes(invoice.status)) throw new Error('Demo invoice not payable');
-    this.validate(amount, method, key, invoice.balance);
+    this.validate(amount, method, key, invoice.balance, minimumPayment(invoice.amount, invoice.paidTotal));
     this.payments.update(payments => [...payments, { invoiceId: id, amount, method, key }]);
   }
-  private validate(amount: string, method: string, key: string, balance: string): void {
-    if (!key || !method || method.length > 40 || cents(amount) <= 0n || cents(amount) > cents(balance)) {
+  private validate(amount: string, method: string, key: string, balance: string, minimum: string): void {
+    if (!key || !method || method.length > 40 || cents(amount) <= 0n || cents(amount) < cents(minimum) || cents(amount) > cents(balance)) {
       throw new Error('Invalid demo payment');
     }
   }

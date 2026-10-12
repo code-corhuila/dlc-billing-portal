@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import type { InvoicePaymentSession } from '../model/invoice-payment-session';
 import { copMoney } from '../model/cop-money';
 import { formatCopMoney } from '../presentation/format-cop-money';
+import { minimumPayment } from '../domain/initial-payment-minimum';
 
 @Component({
   selector: 'dlc-invoice-payment-page', standalone: true, imports: [FormsModule],
@@ -15,6 +16,7 @@ import { formatCopMoney } from '../presentation/format-cop-money';
       <article><h2>{{ selected.number }} · {{ selected.patientName }}</h2>
         <p>Total: COP {{ format(selected.amount) }} · Pagado: COP {{ format(selected.paidTotal) }}</p>
         <p><strong>Saldo: COP {{ format(selected.balance) }}</strong> · {{ statusLabels[selected.status] }}</p>
+        <p>Primer abono: mínimo 50% del total, incluidos cargos adicionales. Mínimo actual: COP {{ format(minimum(selected.amount, selected.paidTotal)) }}.</p>
         @if (!canPay) { <p role="status">Tu sesión no permite registrar pagos en esta demostración.</p> }
         <form (ngSubmit)="submit()">
           <label>Valor del pago (COP)<input name="amount" type="text" inputmode="decimal"
@@ -45,6 +47,7 @@ export class InvoicePaymentPageComponent {
   private intent?: { fingerprint: string; key: string };
   amount = ''; method = ''; feedback = '';
   readonly format = formatCopMoney;
+  readonly minimum = minimumPayment;
   readonly statusLabels = { DRAFT: 'Borrador', ISSUED: 'Emitida', PARTIALLY_PAID: 'Pago parcial', PAID: 'Pagada', CANCELLED: 'Cancelada' };
   get invoice() { return this.session.detail(this.invoiceId); }
   get history() { return this.session.history(this.invoiceId); }
@@ -55,7 +58,7 @@ export class InvoicePaymentPageComponent {
     if (!this.method.trim() || this.method.trim().length > 40) return false;
     try {
       const value = BigInt(copMoney(this.amount).replace('.', ''));
-      return value > 0n && value <= BigInt(invoice.balance.replace('.', ''));
+      return value > 0n && value >= BigInt(minimumPayment(invoice.amount, invoice.paidTotal).replace('.', '')) && value <= BigInt(invoice.balance.replace('.', ''));
     } catch { return false; }
   }
   submit(): void {
