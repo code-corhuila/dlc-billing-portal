@@ -3,6 +3,9 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, beforeEach, expect, it } from 'vitest';
 import { publishRelease } from './release-output.mjs';
+import { execFileSync } from 'node:child_process';
+import { pathToFileURL } from 'node:url';
+import { resolve } from 'node:path';
 
 let root: string;
 beforeEach(() => {
@@ -58,4 +61,23 @@ it('preserves an existing release and does not start compilation', () => {
     throw new Error('must not compile');
   })).toThrow(/Billing release already exists/);
   expect(readFileSync(join(releases(), 'demo/entry.js'), 'utf8')).toBe('complete artifact');
+});
+
+it('records abrupt termination and permits confirmed offline recovery', () => {
+  const module = pathToFileURL(resolve('scripts/release-output.mjs')).href;
+  const program = `import { publishRelease } from ${JSON.stringify(module)};
+    publishRelease(process.argv[1], 'demo', () => process.exit(7));`;
+  expect(() => execFileSync(process.execPath, ['--input-type=module', '-e', program, root])).toThrow();
+  const lock = join(releases(), '.build-lock');
+  const owner = JSON.parse(readFileSync(join(lock, 'owner.json'), 'utf8'));
+  expect(owner.pid).toBeGreaterThan(0);
+  expect(owner.pid).not.toBe(process.pid);
+  expect(owner.host).toBeTruthy();
+  expect(() => publishRelease(root, 'demo', () => {})).toThrow(/already in progress/);
+  // execFileSync has waited for this fixture's child to exit; no contender is running.
+  expect(dirname(owner.stage)).toBe(releases());
+  rmSync(owner.stage, { recursive: true });
+  rmSync(lock, { recursive: true });
+  publishRelease(root, 'demo', () => {});
+  expect(readdirSync(releases())).toEqual(['demo']);
 });
