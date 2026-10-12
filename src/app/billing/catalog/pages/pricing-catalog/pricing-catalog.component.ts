@@ -42,15 +42,17 @@ export class PricingCatalogComponent {
   readonly errorMessage = signal('');
 
   searchTerm = '';
+  onlyActive = true;
 
   form: CreateProcedurePriceRequest =
     this.createEmptyForm();
 
   get filteredPrices(): ProcedurePrice[] {
-    return this.pricingCatalogService.filterPrices(
+    const prices = this.pricingCatalogService.filterPrices(
       this.prices(),
       this.searchTerm,
     );
+    return this.onlyActive ? prices.filter(price => price.active) : prices;
   }
 
   openForm(): void {

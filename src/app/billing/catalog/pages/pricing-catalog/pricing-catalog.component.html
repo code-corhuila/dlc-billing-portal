@@ -3,18 +3,12 @@
   <header class="page-header">
 
     <div>
-      <p class="eyebrow">
-        Billing
-      </p>
-
       <h1 tabindex="-1">
-        Precios de procedimientos
+        Catálogo de Procedimientos Dentales
       </h1>
 
       <p class="page-description">
-        Consulta las versiones vigentes de precios
-        y crea nuevas versiones para los
-        procedimientos odontológicos.
+        Precios base y versiones para atención en el Consultorio Dental DI-LUCCA.
       </p>
     </div>
 
@@ -55,25 +49,12 @@
         Buscar procedimiento
       </span>
 
-      <input type="search" placeholder="Nombre o código..." [(ngModel)]="searchTerm" />
+      <input type="search" placeholder="Buscar procedimiento por nombre o código..." [(ngModel)]="searchTerm" />
 
     </label>
 
 
-    <button type="button" class="secondary-button" (click)="simulateError()">
-      Simular error
-    </button>
-
-
-    <button type="button" class="secondary-button" (click)="simulateEmpty()">
-      Simular vacío
-    </button>
-
-
-    <button type="button" class="secondary-button" (click)="restoreFixtures()">
-      Restaurar
-    </button>
-
+    <label class="active-filter"><input type="checkbox" [(ngModel)]="onlyActive" /> Solo precios vigentes</label>
   </section>
 
 
@@ -112,77 +93,26 @@
 
   } @else {
 
-  <section class="catalog-card">
-
-    <div class="table-wrapper" tabindex="0" role="region" aria-label="Versiones de precios">
-
-      <table>
-
-        <thead>
-          <tr>
-            <th>Procedimiento</th>
-            <th>Código</th>
-            <th>Precio</th>
-            <th>Versión</th>
-            <th>Vigente desde</th>
-            <th>Estado</th>
-          </tr>
-        </thead>
-
-        <tbody>
-
-          @for (
-          price of filteredPrices;
-          track price.id
-          ) {
-
-          <tr>
-
-            <td>
-              <strong>
-                {{ price.procedureName }}
-              </strong>
-            </td>
-
-            <td>
-              {{ price.procedureCode }}
-            </td>
-
-            <td>
-              {{ formatMoney(price.amount) }}
-            </td>
-
-            <td>
-              v{{ price.version }}
-            </td>
-
-            <td>
-              {{ price.validFrom }}
-            </td>
-
-            <td>
-
-              <span class="status-badge" [class.active]="price.active">
-                {{
-                price.active
-                ? 'Vigente'
-                : 'Histórico'
-                }}
-              </span>
-
-            </td>
-
-          </tr>
-
-          }
-
-        </tbody>
-
-      </table>
-
-    </div>
-
-  </section>
+  <ul class="catalog-grid" aria-label="Versiones de precios">
+    @for (price of filteredPrices; track price.id) {
+      <li class="procedure-card">
+        <article [attr.aria-label]="price.procedureName + ', versión ' + price.version">
+          <div class="card-heading">
+            <strong class="card-price">{{ formatMoney(price.amount) }}</strong>
+            <span class="status-badge" [class.active]="price.active">
+              {{ price.active ? 'Vigente' : 'Histórico' }}
+            </span>
+          </div>
+          <h2>{{ price.procedureName }}</h2>
+          <p class="procedure-code">{{ price.procedureCode }}</p>
+          <footer class="card-footer">
+            <span class="version-badge">Versión {{ price.version }}</span>
+            <span>Desde <time>{{ price.validFrom }}</time></span>
+          </footer>
+        </article>
+      </li>
+    }
+  </ul>
 
   }
 
