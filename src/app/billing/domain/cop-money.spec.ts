@@ -16,5 +16,5 @@ it('formats cents and maximum precision without rounding', async () => {
 });
 it.each([1.23, { toString: () => '1.23' }])('rejects non-string values instead of coercing money %j', async value => {
   const { copMoney } = await import('./cop-money');
-  expect(() => copMoney(value as never)).toThrow(/Invalid COP money/);
+  expect(() => copMoney(value)).toThrow(/Invalid COP money/);
 });
