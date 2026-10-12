@@ -202,6 +202,29 @@ it('preserves cleanup rejection for the compositor after forced cancellation', a
   expect(child.remove).toHaveBeenCalledTimes(1);
 });
 
+it.each(['response', 'failure'])('ignores late navigation %s after destruction with a live signal', async outcome => {
+  const { BILLING_CONTEXT, BillingCompositionRoot } = await import('./billing-root.component');
+  const capabilities = context();
+  let settle!: () => void;
+  capabilities.navigation.request.mockReturnValue(new Promise((resolve, reject) => {
+    settle = () => outcome === 'failure' ? reject(new Error('late failure')) : resolve({ status: 'cancelled' });
+  }));
+  const injector = Injector.create({ providers: [{ provide: BILLING_CONTEXT, useValue: capabilities }] });
+  const frame = runInInjectionContext(injector, () => new BillingCompositionRoot());
+  const writes = vi.spyOn(frame.navigationMessage, 'set');
+  const pending = frame.openInvoice('invoice-001');
+  writes.mockClear();
+  injector.destroy();
+  expect(controller.signal.aborted).toBe(false);
+  settle();
+  await pending;
+  expect(writes).not.toHaveBeenCalled();
+  expect(capabilities.reportFailure).not.toHaveBeenCalled();
+  capabilities.navigation.request.mockClear();
+  await frame.openInvoice('invoice-001');
+  expect(capabilities.navigation.request).not.toHaveBeenCalled();
+});
+
 it('reports only a safe render failure code (regression)', async () => {
   const capabilities = context();
   const { mount } = await import('../../portal-entry');
