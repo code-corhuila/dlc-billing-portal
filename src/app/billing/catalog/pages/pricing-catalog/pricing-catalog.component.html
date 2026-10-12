@@ -1,0 +1,251 @@
+<section class="billing-page" aria-label="Catálogo de procedimientos">
+
+  <header class="page-header">
+
+    <div>
+      <h1 tabindex="-1">
+        Catálogo de Procedimientos Dentales
+      </h1>
+
+      <p class="page-description">
+        Precios base y versiones para atención en el Consultorio Dental DI-LUCCA.
+      </p>
+    </div>
+
+    <div class="header-actions">
+
+      @if (!composed) { <a routerLink="/prices/rules" class="secondary-link">
+        Reglas adicionales
+      </a> }
+
+      <button #newPriceButton type="button" class="primary-button" [disabled]="!canManagePrices || submitting()" (click)="openForm()">
+        + Nuevo precio
+      </button>
+
+    </div>
+
+  </header>
+
+
+  <section class="mock-notice" role="note">
+
+    <strong>
+      Demostración Cut 2
+    </strong>
+
+    <span>
+      Los datos mostrados son ficticios y todavía
+      no están conectados al backend de Billing.
+    </span>
+
+  </section>
+
+
+  <section class="toolbar">
+
+    <label class="search-field">
+
+      <span>
+        Buscar procedimiento
+      </span>
+
+      <input type="search" placeholder="Buscar procedimiento por nombre o código..." [(ngModel)]="searchTerm" />
+
+    </label>
+
+
+    <label class="active-filter"><input type="checkbox" [(ngModel)]="onlyActive" /> Solo precios vigentes</label>
+  </section>
+
+
+  @if (errorMessage()) {
+
+  <section class="state-card error-state" role="alert">
+
+    <h2>
+      No fue posible cargar el catálogo
+    </h2>
+
+    <p>
+      {{ errorMessage() }}
+    </p>
+
+    <button type="button" class="secondary-button" (click)="restoreFixtures()">
+      Intentar nuevamente
+    </button>
+
+  </section>
+
+  } @else if (filteredPrices.length === 0) {
+
+  <section class="state-card" role="status">
+
+    <h2>
+      No hay precios para mostrar
+    </h2>
+
+    <p>
+      No se encontraron versiones de precios
+      con los criterios actuales.
+    </p>
+
+  </section>
+
+  } @else {
+
+  <ul class="catalog-grid" aria-label="Versiones de precios">
+    @for (price of filteredPrices; track price.id) {
+      <li class="procedure-card">
+        <article [attr.aria-label]="price.procedureName + ', versión ' + price.version">
+          <div class="card-heading">
+            <strong class="card-price">{{ formatMoney(price.amount) }}</strong>
+            <span class="status-badge" [class.active]="price.active">
+              {{ price.active ? 'Vigente' : 'Histórico' }}
+            </span>
+          </div>
+          <h2>{{ price.procedureName }}</h2>
+          <p class="procedure-code">{{ price.procedureCode }}</p>
+          <footer class="card-footer">
+            <span class="version-badge">Versión {{ price.version }}</span>
+            <span>Desde <time>{{ price.validFrom }}</time></span>
+            <button type="button" class="edit-price" [disabled]="!price.active || !canManagePrices || submitting()"
+              [attr.aria-label]="'Nueva versión de ' + price.procedureName" (click)="openForPrice(price)">✎</button>
+          </footer>
+        </article>
+      </li>
+    }
+  </ul>
+
+  }
+
+
+  @if (successMessage()) {
+
+  <section class="success-message" role="status">
+    {{ successMessage() }}
+  </section>
+
+  }
+
+
+    <dialog #priceDialog class="modal" aria-labelledby="new-price-title" (cancel)="$event.preventDefault(); closeForm()">
+
+      <header class="modal-header">
+
+        <div>
+
+          <p class="eyebrow">
+            Nueva versión
+          </p>
+
+          <h2 id="new-price-title">
+            {{ editing ? 'Nueva versión del precio' : 'Nuevo precio de procedimiento' }}
+          </h2>
+
+        </div>
+
+
+        <button type="button" class="icon-button" aria-label="Cerrar formulario" [disabled]="submitting()"
+          (click)="closeForm()">
+          ×
+        </button>
+
+      </header>
+
+
+      <form (ngSubmit)="submitPrice()" #priceForm="ngForm">
+
+        <div class="form-grid">
+
+          <label>
+
+            <span>
+              Código del procedimiento *
+            </span>
+
+            <input type="text" name="procedureCode" [(ngModel)]="form.procedureCode" required
+              [readonly]="editing" [disabled]="submitting()" />
+
+          </label>
+
+
+          <label>
+
+            <span>
+              Nombre del procedimiento *
+            </span>
+
+            <input type="text" name="procedureName" [(ngModel)]="form.procedureName" required
+              autofocus [disabled]="submitting()" />
+
+          </label>
+
+
+          <label>
+
+            <span>
+              Precio en COP *
+            </span>
+
+            <input type="text" inputmode="decimal" name="amount" [(ngModel)]="form.amount" required
+              placeholder="80000.00" [disabled]="submitting()" />
+
+            @if (!validAmount) { <small class="validation-message">
+              Usa un precio positivo con dos decimales y punto, por ejemplo 80000.00.
+              </small>
+
+              }
+
+          </label>
+
+
+          <label>
+
+            <span>
+              Moneda
+            </span>
+
+            <input type="text" value="COP" disabled />
+
+          </label>
+
+
+          <label>
+
+            <span>
+              Vigente desde *
+            </span>
+
+            <input type="date" name="validFrom" [(ngModel)]="form.validFrom" required [disabled]="submitting()" />
+
+          </label>
+
+        </div>
+
+
+        <footer class="modal-actions">
+
+          <button type="button" class="secondary-button" [disabled]="submitting()" (click)="closeForm()">
+            Cancelar
+          </button>
+
+
+          <button type="submit" class="primary-button" [disabled]="
+                !canManagePrices || priceForm.invalid ||
+                !validAmount ||
+                submitting()
+              ">
+            {{
+            submitting()
+            ? 'Guardando...'
+            : 'Guardar nueva versión'
+            }}
+          </button>
+
+        </footer>
+
+      </form>
+
+    </dialog>
+
+</section>

@@ -1,0 +1,17 @@
+{
+  "revision": "18813df4fca61f2d858edcbf6d873d507ef6729f",
+  "money": {
+    "type": "string",
+    "pattern": "^\\d{1,12}\\.\\d{2}$"
+  },
+  "status": {
+    "type": "string",
+    "enum": [
+      "DRAFT",
+      "ISSUED",
+      "PARTIALLY_PAID",
+      "PAID",
+      "CANCELLED"
+    ]
+  }
+}

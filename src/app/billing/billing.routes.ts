@@ -1,0 +1,54 @@
+import { Routes } from '@angular/router';
+import { inject } from '@angular/core';
+import { INVOICE_LIST_SOURCE } from './data/invoice-list-source';
+
+export const BILLING_ROUTES: Routes = [
+  {
+    path: '',
+    resolve: { invoices: () => inject(INVOICE_LIST_SOURCE).read() },
+    loadComponent: () =>
+      import(
+        './pages/billing-list-page.component'
+      ).then(
+        (m) => m.BillingListPageComponent,
+      ),
+  },
+  {
+    path: 'prices',
+    loadComponent: () =>
+      import(
+        './catalog/pages/pricing-catalog/pricing-catalog.component'
+      ).then(
+        (m) => m.PricingCatalogComponent,
+      ),
+  },
+  {
+    path: 'prices/rules',
+    loadComponent: () =>
+      import(
+        './catalog/pages/extra-charge-rules/extra-charge-rules.component'
+      ).then(
+        (m) => m.ExtraChargeRulesComponent,
+      ),
+  },
+  {
+    path: 'invoices/:id',
+    loadComponent: () =>
+      import(
+        './pages/billing-page.component'
+      ).then(
+        (m) => m.BillingPageComponent,
+      ),
+  },
+  {
+    path: 'invoices/:id/payments/new',
+    loadComponent: () =>
+      import(
+        './pages/payment-page.component'
+      ).then(
+        (m) => m.PaymentPageComponent,
+      ),
+  },
+];
+
+export default BILLING_ROUTES;

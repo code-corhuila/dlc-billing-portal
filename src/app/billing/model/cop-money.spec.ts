@@ -1,0 +1,14 @@
+import { expect, it } from 'vitest';
+
+it.each(['0.00', '130000.00', '999999999999.99', '000001.01'])('preserves exact contract money %s', async value => {
+  const { copMoney } = await import('./cop-money');
+  expect(copMoney(value)).toBe(value);
+});
+it.each(['-1.00', '1', '1.1', '1.001', '1000000000000.00', ' 1.00', 'NaN', '1.00\n'])('rejects non-contract money %s', async value => {
+  const { copMoney } = await import('./cop-money');
+  expect(() => copMoney(value)).toThrow(/Invalid COP money/);
+});
+it.each([1.23, { toString: () => '1.23' }])('rejects non-string values instead of coercing money %j', async value => {
+  const { copMoney } = await import('./cop-money');
+  expect(() => copMoney(value)).toThrow(/Invalid COP money/);
+});

@@ -1,0 +1,40 @@
+{
+  "name": "dlc-billing-portal",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "ng build",
+    "contract:check": "node scripts/invoice-contract.mjs --check",
+    "build:portal": "node scripts/build-portal.mjs",
+    "serve:portal": "node scripts/serve-portal.mjs",
+    "start": "ng run dlc-billing-portal:serve-original",
+    "start:federation": "ng serve",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage"
+  },
+  "dependencies": {
+    "@angular-architects/native-federation": "^21.0.0",
+    "@angular/animations": "^21.2.24",
+    "@angular/common": "^21.0.0",
+    "@angular/compiler": "^21.0.0",
+    "@angular/core": "^21.0.0",
+    "@angular/forms": "^21.2.24",
+    "@angular/platform-browser": "^21.0.0",
+    "@angular/router": "^21.0.0",
+    "es-module-shims": "^1.10.1",
+    "rxjs": "~7.8.0",
+    "tslib": "^2.8.0"
+  },
+  "devDependencies": {
+    "@angular/build": "^21.0.0",
+    "@angular/cli": "^21.0.0",
+    "@angular/compiler-cli": "^21.0.0",
+    "@vitest/coverage-v8": "4.1.11",
+    "js-yaml": "4.3.2",
+    "typescript": "~5.9.0",
+    "vitest": "^4.0.0"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

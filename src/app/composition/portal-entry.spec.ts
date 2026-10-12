@@ -1,0 +1,270 @@
+import '@angular/compiler';
+import { createApplication } from '@angular/platform-browser';
+import { ErrorHandler, Injector, runInInjectionContext, signal } from '@angular/core';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { provideInvoiceListSource } from '../billing/data/invoice-list-source';
+
+vi.mock('@angular/platform-browser', () => ({ createApplication: vi.fn() }));
+
+const route = (localPath = '/') => ({
+  compositionId: 'composition-1', globalPath: `/app/billing${localPath}`,
+  basePath: '/app/billing', localPath, query: {}, fragment: '',
+});
+let controller: AbortController;
+const root = { route: signal(route()), canLeave: vi.fn(() => true) };
+const child = { remove: vi.fn() };
+const host = {
+  ownerDocument: { createElement: vi.fn(() => child) }, appendChild: vi.fn(),
+} as unknown as HTMLElement;
+const app = { bootstrap: vi.fn(() => ({ instance: root })), destroy: vi.fn() };
+const context = () => ({
+  contractVersion: 1 as const, portalId: 'billing' as const,
+  mountId: 'mount-1', compositionId: 'composition-1', route: route(),
+  signal: controller.signal, navigation: { request: vi.fn() },
+  session: { getSnapshot: vi.fn(), subscribe: vi.fn(() => () => {}) },
+  http: { request: vi.fn() }, reportFailure: vi.fn(),
+});
+const mount = async () => (await import('../../portal-entry')).mount(host, context());
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  root.canLeave.mockReturnValue(true);
+  controller = new AbortController();
+  root.route.set(route());
+  app.bootstrap.mockImplementation(() => ({ instance: root }));
+  vi.mocked(createApplication).mockResolvedValue(app as never);
+});
+afterEach(() => controller.abort());
+
+it('exports the Billing v1 identity without starting an application', async () => {
+  const entry = await import('../../portal-entry');
+  expect(entry.portalId).toBe('billing');
+  expect(entry.contractVersion).toBe(1);
+  expect(createApplication).not.toHaveBeenCalled();
+});
+
+it('bootstraps inside an owned child and leaves shared capabilities unused', async () => {
+  const capabilities = context();
+  const entry = await import('../../portal-entry');
+  await entry.mount(host, capabilities);
+  expect(host.appendChild).toHaveBeenCalledWith(child);
+  expect(app.bootstrap).toHaveBeenCalledWith(expect.any(Function), child);
+  expect(capabilities.http.request).not.toHaveBeenCalled();
+  expect(capabilities.session.subscribe).not.toHaveBeenCalled();
+});
+
+it('destroys only the owned application and child, once', async () => {
+  const handle = await mount();
+  await handle.unmount();
+  await handle.unmount();
+  expect(app.destroy).toHaveBeenCalledTimes(1);
+  expect(child.remove).toHaveBeenCalledTimes(1);
+});
+
+it('cleans a partial mount when bootstrap fails', async () => {
+  app.bootstrap.mockImplementationOnce(() => { throw new Error('bootstrap failed'); });
+  await expect(mount()).rejects.toThrow('bootstrap failed');
+  expect(app.destroy).toHaveBeenCalledTimes(1);
+  expect(child.remove).toHaveBeenCalledTimes(1);
+});
+
+it('cleans the owned child when application creation fails', async () => {
+  vi.mocked(createApplication).mockRejectedValueOnce(new Error('creation failed'));
+  await expect(mount()).rejects.toThrow('creation failed');
+  expect(child.remove).toHaveBeenCalledTimes(1);
+  expect(app.destroy).not.toHaveBeenCalled();
+});
+
+it('rejects an already cancelled mount without allocating resources', async () => {
+  controller.abort();
+  await expect(mount()).rejects.toThrow('CANCELLED');
+  expect(createApplication).not.toHaveBeenCalled();
+  expect(host.appendChild).not.toHaveBeenCalled();
+});
+
+it('destroys a late application after cancellation during creation', async () => {
+  vi.mocked(createApplication).mockImplementationOnce(async () => {
+    controller.abort();
+    return app as never;
+  });
+  await expect(mount()).rejects.toThrow('CANCELLED');
+  expect(app.bootstrap).not.toHaveBeenCalled();
+  expect(app.destroy).toHaveBeenCalledTimes(1);
+  expect(child.remove).toHaveBeenCalledTimes(1);
+});
+
+it('cleans a mounted application when the compositor aborts its context', async () => {
+  const handle = await mount();
+  controller.abort();
+  await handle.unmount();
+  expect(app.destroy).toHaveBeenCalledTimes(1);
+  expect(child.remove).toHaveBeenCalledTimes(1);
+});
+
+it('removes the abort listener and owned child even if destruction fails', async () => {
+  const removeListener = vi.spyOn(controller.signal, 'removeEventListener');
+  const handle = await mount();
+  app.destroy.mockImplementationOnce(() => { throw new Error('cleanup failed'); });
+  await expect(handle.unmount()).rejects.toThrow('cleanup failed');
+  expect(removeListener).toHaveBeenCalledWith('abort', expect.any(Function));
+  expect(child.remove).toHaveBeenCalledTimes(1);
+  controller.abort();
+  expect(app.destroy).toHaveBeenCalledTimes(1);
+});
+
+it('updates local routes in the same application without global navigation', async () => {
+  const capabilities = context();
+  const { mount } = await import('../../portal-entry');
+  const handle = await mount(host, capabilities);
+  const nextRoute = route('/missing');
+  await handle.updateRoute(nextRoute);
+  expect(root.route()).toEqual(nextRoute);
+  expect(createApplication).toHaveBeenCalledTimes(1);
+  expect(capabilities.navigation.request).not.toHaveBeenCalled();
+  expect(await handle.canLeave()).toBe(true);
+});
+
+it('rejects route updates and leaving after disposal', async () => {
+  const handle = await mount();
+  await handle.unmount();
+  await expect(handle.updateRoute(route('/missing'))).rejects.toThrow('CANCELLED');
+  expect(await handle.canLeave()).toBe(false);
+});
+
+it('delegates the open-form leave guard to the composition root', async () => {
+  const handle = await mount();
+  root.canLeave.mockReturnValue(false);
+  expect(await handle.canLeave()).toBe(false);
+  root.canLeave.mockReturnValue(true);
+  expect(await handle.canLeave()).toBe(true);
+  await handle.unmount();
+});
+
+it('selects the dummy invoice list at the root and a 404 for unknown local paths', async () => {
+  const { BILLING_CONTEXT, BillingCompositionRoot } =
+    await import('./billing-root.component');
+  const injector = Injector.create({
+    providers: [provideInvoiceListSource(), { provide: BILLING_CONTEXT, useValue: context() }],
+  });
+  const frame = runInInjectionContext(injector, () => new BillingCompositionRoot());
+  expect(frame.title()).toBe('Facturación');
+  expect(frame.isInvoiceList()).toBe(true);
+  expect(frame.invoices).toHaveLength(3);
+  frame.route.set(route('/missing'));
+  expect(frame.isInvoiceList()).toBe(false);
+  expect(frame.title()).toBe('Página no encontrada');
+  expect(frame.message()).toBe('La ruta solicitada no está disponible en Billing.');
+  injector.destroy();
+});
+
+it('requests invoice navigation through the compositor and handles refusal or failure', async () => {
+  const { BILLING_CONTEXT, BillingCompositionRoot } = await import('./billing-root.component');
+  const capabilities = context();
+  const injector = Injector.create({ providers: [provideInvoiceListSource(), { provide: BILLING_CONTEXT, useValue: capabilities }] });
+  const frame = runInInjectionContext(injector, () => new BillingCompositionRoot());
+  capabilities.navigation.request.mockResolvedValue({ status: 'applied' });
+  await frame.openInvoice('invoice-001');
+  expect(capabilities.navigation.request).toHaveBeenCalledWith({ path: '/app/billing/invoices/invoice-001' });
+  capabilities.navigation.request.mockResolvedValue({ status: 'cancelled' });
+  await frame.openInvoice('invoice-002');
+  expect(frame.navigationMessage()).not.toBe('');
+  capabilities.navigation.request.mockRejectedValue(new Error('private details'));
+  await frame.openInvoice('invoice-002');
+  expect(capabilities.reportFailure).toHaveBeenCalledWith({ code: 'PORTAL_TASK_FAILED' });
+  expect(frame.navigationMessage()).not.toContain('private details');
+  controller.abort();
+  capabilities.navigation.request.mockClear();
+  await frame.openInvoice('invoice-001');
+  expect(capabilities.navigation.request).not.toHaveBeenCalled();
+  injector.destroy();
+});
+
+it.each(['cancelled', 'rejected', 'failure'] as const)(
+  'ignores late navigation %s after context cancellation (regression)', async outcome => {
+    const { BILLING_CONTEXT, BillingCompositionRoot } = await import('./billing-root.component');
+    const capabilities = context();
+    let resolve!: (value: { status: 'cancelled' | 'rejected' }) => void;
+    let reject!: (error: Error) => void;
+    capabilities.navigation.request.mockReturnValue(new Promise((res, rej) => {
+      resolve = res; reject = rej;
+    }));
+    const injector = Injector.create({ providers: [provideInvoiceListSource(), { provide: BILLING_CONTEXT, useValue: capabilities }] });
+    try {
+      const frame = runInInjectionContext(injector, () => new BillingCompositionRoot());
+      const writes = vi.spyOn(frame.navigationMessage, 'set');
+      const pending = frame.openInvoice('invoice-001');
+      writes.mockClear();
+      controller.abort();
+      if (outcome === 'failure') reject(new Error('private late failure'));
+      else resolve({ status: outcome });
+      await pending;
+      expect(writes).not.toHaveBeenCalled();
+      expect(capabilities.reportFailure).not.toHaveBeenCalled();
+    } finally { injector.destroy(); }
+  },
+);
+
+it('preserves cleanup rejection for the compositor after forced cancellation', async () => {
+  const handle = await mount();
+  app.destroy.mockImplementationOnce(() => { throw new Error('cleanup failed'); });
+  controller.abort();
+  await expect(handle.unmount()).rejects.toThrow('cleanup failed');
+  await expect(handle.unmount()).rejects.toThrow('cleanup failed');
+  expect(app.destroy).toHaveBeenCalledTimes(1);
+  expect(child.remove).toHaveBeenCalledTimes(1);
+});
+
+it.each(['response', 'failure'])('ignores late navigation %s after destruction with a live signal', async outcome => {
+  const { BILLING_CONTEXT, BillingCompositionRoot } = await import('./billing-root.component');
+  const capabilities = context();
+  let settle!: () => void;
+  capabilities.navigation.request.mockReturnValue(new Promise((resolve, reject) => {
+    settle = () => outcome === 'failure' ? reject(new Error('late failure')) : resolve({ status: 'cancelled' });
+  }));
+  const injector = Injector.create({ providers: [provideInvoiceListSource(), { provide: BILLING_CONTEXT, useValue: capabilities }] });
+  const frame = runInInjectionContext(injector, () => new BillingCompositionRoot());
+  const writes = vi.spyOn(frame.navigationMessage, 'set');
+  const pending = frame.openInvoice('invoice-001');
+  writes.mockClear();
+  injector.destroy();
+  expect(controller.signal.aborted).toBe(false);
+  settle();
+  await pending;
+  expect(writes).not.toHaveBeenCalled();
+  expect(capabilities.reportFailure).not.toHaveBeenCalled();
+  capabilities.navigation.request.mockClear();
+  await frame.openInvoice('invoice-001');
+  expect(capabilities.navigation.request).not.toHaveBeenCalled();
+});
+
+it('reports only a safe render failure code (regression)', async () => {
+  const capabilities = context();
+  const { mount } = await import('../../portal-entry');
+  await mount(host, capabilities);
+  const providers = vi.mocked(createApplication).mock.calls[0][0]!.providers!;
+  const provider = providers.find((p) => typeof p === 'object' && 'provide' in p
+    && p.provide === ErrorHandler) as { useValue: { handleError: (error: Error) => void } };
+  provider.useValue.handleError(new Error('private content'));
+  expect(capabilities.reportFailure).toHaveBeenCalledWith({ code: 'PORTAL_RENDER_FAILED' });
+});
+
+it.each(['cancelled', 'failure'])('deduplicates pending targets and ignores superseded navigation %s', async outcome => {
+  const { BILLING_CONTEXT, BillingCompositionRoot } = await import('./billing-root.component');
+  const capabilities = context();
+  let settle!: () => void;
+  capabilities.navigation.request.mockReturnValueOnce(new Promise((resolve, reject) => {
+    settle = () => outcome === 'failure' ? reject(new Error('obsolete failure')) : resolve({ status: 'cancelled' });
+  })).mockResolvedValueOnce({ status: 'applied' });
+  const injector = Injector.create({ providers: [provideInvoiceListSource(), { provide: BILLING_CONTEXT, useValue: capabilities }] });
+  try {
+    const frame = runInInjectionContext(injector, () => new BillingCompositionRoot());
+    const old = frame.openInvoice('invoice-001');
+    await frame.openInvoice('invoice-001');
+    expect(capabilities.navigation.request).toHaveBeenCalledTimes(1);
+    await frame.openInvoice('invoice-002');
+    expect(capabilities.navigation.request).toHaveBeenCalledTimes(2);
+    settle(); await old;
+    expect(frame.navigationMessage()).toBe('');
+    expect(capabilities.reportFailure).not.toHaveBeenCalled();
+  } finally { injector.destroy(); }
+});
