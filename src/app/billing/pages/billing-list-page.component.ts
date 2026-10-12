@@ -1,6 +1,6 @@
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { dummyInvoiceList, InvoiceListItem, InvoiceListStatus } from '../data/invoice-list.dummy';
+import type { InvoiceListItem, InvoiceListStatus } from '../data/invoice-list.dummy';
 type BillingInvoiceStatusFilter = 'ALL' | InvoiceListStatus;
 
 @Component({
@@ -202,7 +202,7 @@ export class BillingListPageComponent {
   selectedStatus: BillingInvoiceStatusFilter = 'ALL';
   currentPage = 1;
 
-  @Input() invoices: InvoiceListItem[] = dummyInvoiceList.read();
+  @Input() invoices: InvoiceListItem[] = [];
 
   get filteredInvoices(): InvoiceListItem[] {
     const normalizedSearchTerm =

@@ -1,6 +1,7 @@
 import { Component, DestroyRef, InjectionToken, computed, inject, signal } from '@angular/core';
 import { PortalContext } from '../shell-contract';
 import { BillingListPageComponent } from '../billing/pages/billing-list-page.component';
+import { dummyInvoiceList } from '../billing/data/invoice-list.dummy';
 
 export const BILLING_CONTEXT = new InjectionToken<PortalContext>('billing.context');
 
@@ -9,7 +10,7 @@ export const BILLING_CONTEXT = new InjectionToken<PortalContext>('billing.contex
   standalone: true,
   imports: [BillingListPageComponent],
   template: `@if (isInvoiceList()) {
-    <dlc-billing-list-page [composed]="true" (openInvoice)="openInvoice($event)" />
+    <dlc-billing-list-page [composed]="true" [invoices]="invoices" (openInvoice)="openInvoice($event)" />
     <p role="status">{{ navigationMessage() }}</p>
   } @else {
     <section aria-label="Billing"><h1 tabindex="-1">{{ title() }}</h1>
@@ -20,6 +21,7 @@ export class BillingCompositionRoot {
   private readonly context = inject(BILLING_CONTEXT);
   private readonly destroyRef = inject(DestroyRef);
   readonly route = signal(this.context.route);
+  readonly invoices = dummyInvoiceList.read();
   readonly isInvoiceList = computed(() => this.route().localPath === '/');
   readonly navigationMessage = signal('');
   readonly title = computed(() => this.route().localPath === '/'

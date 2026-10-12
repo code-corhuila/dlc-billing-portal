@@ -1,8 +1,10 @@
 import { Routes } from '@angular/router';
+import { dummyInvoiceList } from './data/invoice-list.dummy';
 
 export const BILLING_ROUTES: Routes = [
   {
     path: '',
+    resolve: { invoices: () => dummyInvoiceList.read() },
     loadComponent: () =>
       import(
         './pages/billing-list-page.component'
