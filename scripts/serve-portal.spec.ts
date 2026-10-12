@@ -2,7 +2,7 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import type { AddressInfo } from 'node:net';
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import { readFile } from 'node:fs/promises';
 
 async function withServer(check: (origin: string) => Promise<void>, readAsset = readFile) {
@@ -80,4 +80,36 @@ it('rejects malformed URL encoding as a bad request', async () => {
     expect(response.status).toBe(400);
     await response.text();
   });
+});
+
+it('logs a safe asset diagnostic for internal failures without query or disk details', async () => {
+  const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+  const failingRead = async () => { throw Object.assign(new Error('private disk details'), { code: 'EIO' }); };
+  try {
+    await withServer(async (origin) => {
+      const response = await fetch(`${origin}/portals/billing/0.1.0-demo/entry.js?secret=hidden`);
+      expect(response.status).toBe(500);
+      await response.text();
+      expect(log).toHaveBeenCalledWith(JSON.stringify({
+        event: 'BILLING_PREVIEW_READ_FAILED', code: 'EIO', asset: '0.1.0-demo/entry.js',
+      }));
+      expect(JSON.stringify(log.mock.calls)).not.toMatch(/private disk|secret|hidden/);
+    }, failingRead as typeof readFile);
+  } finally { log.mockRestore(); }
+});
+
+it('rejects outside paths before reading or logging an asset', async () => {
+  const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+  const read = vi.fn(async () => { throw new Error('must not read'); });
+  try {
+    await withServer(async origin => {
+      for (const path of ['/portals/clinical/entry.js', '/portals/billing/%2e%2e%2foutside.js']) {
+        const response = await fetch(origin + path);
+        expect(response.status).toBe(404);
+        await response.text();
+      }
+      expect(read).not.toHaveBeenCalled();
+      expect(log).not.toHaveBeenCalled();
+    }, read as typeof readFile);
+  } finally { log.mockRestore(); }
 });

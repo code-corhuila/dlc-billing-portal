@@ -13,6 +13,7 @@ const types = {
 export function createPortalServer(root = resolve('dist/portals/billing'), readAsset = readFile) {
   const base = resolve(root);
   return createServer(async (request, response) => {
+    let asset;
     response.setHeader('Cache-Control', 'no-store');
     if (request.method !== 'GET' && request.method !== 'HEAD') {
       response.writeHead(405, { Allow: 'GET, HEAD' }).end();
@@ -29,12 +30,17 @@ export function createPortalServer(root = resolve('dist/portals/billing'), readA
         response.writeHead(404).end();
         return;
       }
+      asset = file.slice(base.length + 1).split(sep).join('/');
       const body = await readAsset(file);
       response.writeHead(200, { 'Content-Type': types[extname(file)] ?? 'application/octet-stream' });
       response.end(request.method === 'HEAD' ? undefined : body);
     } catch (error) {
       const status = error instanceof URIError ? 400
-        : ['ENOENT', 'ENOTDIR'].includes(error.code) ? 404 : 500;
+        : ['ENOENT', 'ENOTDIR'].includes(error?.code) ? 404 : 500;
+      if (status === 500) console.error(JSON.stringify({
+        event: 'BILLING_PREVIEW_READ_FAILED',
+        code: /^[A-Z0-9_]+$/.test(error?.code ?? '') ? error.code : 'UNKNOWN', asset,
+      }));
       response.writeHead(status).end();
     }
   });
