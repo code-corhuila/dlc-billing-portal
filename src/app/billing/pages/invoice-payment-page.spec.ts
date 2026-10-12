@@ -1,5 +1,5 @@
 import '@angular/compiler';
-import { Injector, runInInjectionContext } from '@angular/core';
+import { ElementRef, Injector, runInInjectionContext } from '@angular/core';
 import { expect, it, vi } from 'vitest';
 import { InvoicePaymentPageComponent } from './invoice-payment-page.component';
 import { DemoInvoicePayments } from '../data/demo-invoice-payments';
@@ -10,9 +10,12 @@ it('registers a payable invoice once, clears the form and displays local history
   try {
     const page = runInInjectionContext(injector, () => new InvoicePaymentPageComponent());
     page.session = new DemoInvoicePayments(dummyInvoiceList); page.invoiceId = 'invoice-001'; page.canPay = true;
+    const focus = vi.fn();
+    page.paymentHeading = new ElementRef({ focus } as unknown as HTMLElement);
     page.amount = '99999.99'; page.method = 'demo';
     expect(page.dirty).toBe(true); expect(page.canSubmit).toBe(true);
     page.submit(); page.submit();
+    expect(focus).toHaveBeenCalledTimes(1);
     expect(page.invoice?.balance).toBe('0.01');
     expect(page.history).toHaveLength(1); expect(page.dirty).toBe(false);
     page.amount = '0.01'; page.method = 'demo'; page.submit();
