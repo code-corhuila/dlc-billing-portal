@@ -10,4 +10,14 @@ const fixtures: InvoiceListItem[] = [
 ];
 export const dummyInvoiceList: InvoiceListSource = {
   read: () => fixtures.map(invoice => ({ ...invoice })),
+  detail: id => {
+    const invoice = fixtures.find(row => row.id === id);
+    if (!invoice) return undefined;
+    // Fictional financial charges only; no clinical narrative or owner-derived totals.
+    const charges = id === 'invoice-001' ? [
+      { description: 'Procedimiento de demostración', amount: copMoney('80000.00') },
+      { description: 'Material de demostración', amount: copMoney('50000.00') },
+    ] : [{ description: 'Procedimiento de demostración', amount: invoice.amount }];
+    return { ...invoice, charges };
+  },
 };
