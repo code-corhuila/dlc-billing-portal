@@ -1,6 +1,8 @@
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import type { InvoiceListItem, InvoiceListStatus } from '../data/invoice-list.dummy';
+import type { InvoiceListItem, InvoiceListStatus } from '../model/invoice-list-item';
+import { copMoney, formatCopMoney } from '../domain/cop-money';
+import { INVOICE_STATUSES } from '../model/invoice-contract.generated';
 type BillingInvoiceStatusFilter = 'ALL' | InvoiceListStatus;
 
 @Component({
@@ -27,7 +29,7 @@ type BillingInvoiceStatusFilter = 'ALL' | InvoiceListStatus;
 
           <strong>
             COP
-            {{ monthlyIncome.toLocaleString('es-CO') }}
+            {{ formatAmount(monthlyIncome) }}
           </strong>
         </article>
 
@@ -136,7 +138,7 @@ type BillingInvoiceStatusFilter = 'ALL' | InvoiceListStatus;
 
                   <td>
                     COP
-                    {{ invoice.amount.toLocaleString('es-CO') }}
+                    {{ formatAmount(invoice.amount) }}
                   </td>
 
                   <td>
@@ -192,7 +194,8 @@ export class BillingListPageComponent {
     DRAFT: 'Borrador', ISSUED: 'Emitida', PARTIALLY_PAID: 'Pago parcial',
     PAID: 'Pagada', CANCELLED: 'Cancelada',
   };
-  readonly monthlyIncome = 250000;
+  readonly monthlyIncome = copMoney('250000.00');
+  readonly formatAmount = formatCopMoney;
   readonly pendingInvoices = 2;
   readonly paidInvoices = 1;
 
@@ -255,11 +258,7 @@ export class BillingListPageComponent {
   updateSelectedStatus(value: string): void {
     const allowedStatuses: BillingInvoiceStatusFilter[] = [
       'ALL',
-      'DRAFT',
-      'ISSUED',
-      'PARTIALLY_PAID',
-      'PAID',
-      'CANCELLED',
+      ...INVOICE_STATUSES,
     ];
 
     if (
