@@ -197,8 +197,12 @@ export class BillingListPageComponent {
   };
   readonly monthlyIncome = copMoney('250000.00');
   readonly formatAmount = formatCopMoney;
-  readonly pendingInvoices = 2;
-  readonly paidInvoices = 1;
+  get pendingInvoices(): number {
+    return this.invoices.filter(invoice => ['ISSUED', 'PARTIALLY_PAID'].includes(invoice.status)).length;
+  }
+  get paidInvoices(): number {
+    return this.invoices.filter(invoice => invoice.status === 'PAID').length;
+  }
 
   readonly pageSize = 2;
 
