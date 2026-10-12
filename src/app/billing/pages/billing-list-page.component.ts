@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
 type BillingInvoiceStatus =
@@ -34,6 +34,7 @@ interface BillingInvoiceListItem {
         <p>
           Consulta las facturas y su estado de pago.
         </p>
+        <p role="note">Demostración con datos ficticios. Sin conexión con Billing API.</p>
       </header>
 
       <section aria-label="Resumen de facturación">
@@ -158,11 +159,14 @@ interface BillingInvoiceListItem {
                   </td>
 
                   <td>
-                    <a
+                    @if (composed) {
+                      <button type="button" (click)="openInvoice.emit(invoice.id)"
+                        [attr.aria-label]="'Ver factura ' + invoice.number">Ver factura</button>
+                    } @else { <a
                       [routerLink]="getInvoiceDetailPath(invoice.id)"
                     >
                       Ver factura
-                    </a>
+                    </a> }
                   </td>
                 </tr>
               }
@@ -196,6 +200,8 @@ interface BillingInvoiceListItem {
   `,
 })
 export class BillingListPageComponent {
+  @Input() composed = false;
+  @Output() readonly openInvoice = new EventEmitter<string>();
   readonly monthlyIncome = 250000;
   readonly pendingInvoices = 2;
   readonly paidInvoices = 1;
