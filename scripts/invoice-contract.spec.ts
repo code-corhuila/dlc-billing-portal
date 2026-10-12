@@ -8,6 +8,11 @@ const snapshot = {
   money: { type: 'string', pattern: '^\\d{1,12}\\.\\d{2}$' },
   status: { type: 'string', enum: ['DRAFT', 'ISSUED', 'PARTIALLY_PAID', 'PAID', 'CANCELLED'] },
 };
+it('keeps the checked-in projection aligned with generated frontend constraints (regression)', async () => {
+  const { verifyContract } = await import('./invoice-contract.mjs');
+  const approved = JSON.parse(readFileSync('contracts/invoice-list.snapshot.json', 'utf8'));
+  expect(() => verifyContract(approved, 'src/app/billing/model/invoice-contract.generated.ts')).not.toThrow();
+});
 it('generates status types and money constraints from the reviewed projection', async () => {
   const { renderContract } = await import('./invoice-contract.mjs');
   const generated = renderContract(snapshot);
