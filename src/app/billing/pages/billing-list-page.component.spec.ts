@@ -9,6 +9,13 @@ import {
 import { BillingListPageComponent } from './billing-list-page.component';
 
 describe('BillingListPageComponent', () => {
+  it('uses supplied invoice rows instead of default fixtures (regression)', () => {
+    const component = new BillingListPageComponent();
+    component.invoices = [{ id: 'external-demo', number: 'DEMO-42', patientName: 'Demo', amount: 50000, status: 'ISSUED' }];
+    component.updateSearchTerm('DEMO-42');
+    expect(component.paginatedInvoices.map(i => i.id)).toEqual(['external-demo']);
+    expect(component.totalPages).toBe(1);
+  });
   it('emits a selected invoice for composed navigation without owning a router', () => {
     const component = new BillingListPageComponent();
     const selected: string[] = [];

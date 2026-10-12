@@ -167,6 +167,31 @@ it('requests invoice navigation through the compositor and handles refusal or fa
   injector.destroy();
 });
 
+it.each(['cancelled', 'rejected', 'failure'] as const)(
+  'ignores late navigation %s after context cancellation (regression)', async outcome => {
+    const { BILLING_CONTEXT, BillingCompositionRoot } = await import('./billing-root.component');
+    const capabilities = context();
+    let resolve!: (value: { status: 'cancelled' | 'rejected' }) => void;
+    let reject!: (error: Error) => void;
+    capabilities.navigation.request.mockReturnValue(new Promise((res, rej) => {
+      resolve = res; reject = rej;
+    }));
+    const injector = Injector.create({ providers: [{ provide: BILLING_CONTEXT, useValue: capabilities }] });
+    try {
+      const frame = runInInjectionContext(injector, () => new BillingCompositionRoot());
+      const writes = vi.spyOn(frame.navigationMessage, 'set');
+      const pending = frame.openInvoice('invoice-001');
+      writes.mockClear();
+      controller.abort();
+      if (outcome === 'failure') reject(new Error('private late failure'));
+      else resolve({ status: outcome });
+      await pending;
+      expect(writes).not.toHaveBeenCalled();
+      expect(capabilities.reportFailure).not.toHaveBeenCalled();
+    } finally { injector.destroy(); }
+  },
+);
+
 it('preserves cleanup rejection for the compositor after forced cancellation', async () => {
   const handle = await mount();
   app.destroy.mockImplementationOnce(() => { throw new Error('cleanup failed'); });
