@@ -1,42 +1,27 @@
-import { Component } from '@angular/core';
+import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { RouterLink } from '@angular/router';
-
-type BillingInvoiceStatus =
-  | 'DRAFT'
-  | 'ISSUED'
-  | 'PARTIAL'
-  | 'PAID'
-  | 'CANCELLED';
-
-type BillingInvoiceStatusFilter =
-  | 'ALL'
-  | BillingInvoiceStatus;
-
-interface BillingInvoiceListItem {
-  id: string;
-  number: string;
-  patientName: string;
-  amount: number;
-  status: BillingInvoiceStatus;
-}
+import type { InvoiceListItem, InvoiceListStatus } from '../data/invoice-list.dummy';
+type BillingInvoiceStatusFilter = 'ALL' | InvoiceListStatus;
 
 @Component({
   selector: 'dlc-billing-list-page',
   standalone: true,
   imports: [RouterLink],
+  styleUrl: './billing-list-page.component.css',
   template: `
-    <main>
+    <section class="billing-page" aria-label="Facturación y pagos">
       <header>
         <p>Billing</p>
 
-        <h1>Facturación y pagos</h1>
+        <h1 tabindex="-1">Facturación y pagos</h1>
 
         <p>
           Consulta las facturas y su estado de pago.
         </p>
+        <p role="note">Demostración con datos ficticios. Sin conexión con Billing API.</p>
       </header>
 
-      <section aria-label="Resumen de facturación">
+      <section class="summary" aria-label="Resumen de facturación">
         <article>
           <p>Ingresos del mes</p>
 
@@ -63,12 +48,12 @@ interface BillingInvoiceListItem {
         </article>
       </section>
 
-      <section aria-labelledby="invoice-list-title">
+      <section class="invoice-panel" aria-labelledby="invoice-list-title">
         <h2 id="invoice-list-title">
           Facturas
         </h2>
 
-        <div>
+        <div class="filters">
           <label for="invoice-search">
             Buscar factura
           </label>
@@ -104,7 +89,7 @@ interface BillingInvoiceListItem {
               Emitida
             </option>
 
-            <option value="PARTIAL">
+            <option value="PARTIALLY_PAID">
               Pago parcial
             </option>
 
@@ -119,10 +104,11 @@ interface BillingInvoiceListItem {
         </div>
 
         @if (filteredInvoices.length === 0) {
-          <p>
+          <p role="status">
             No se encontraron facturas con los filtros seleccionados.
           </p>
         } @else {
+          <div class="table-scroll" tabindex="0" role="region" aria-label="Tabla de facturas">
           <table>
             <thead>
               <tr>
@@ -154,20 +140,24 @@ interface BillingInvoiceListItem {
                   </td>
 
                   <td>
-                    {{ invoice.status }}
+                    {{ statusLabels[invoice.status] }}
                   </td>
 
                   <td>
-                    <a
+                    @if (composed) {
+                      <button type="button" (click)="openInvoice.emit(invoice.id)"
+                        [attr.aria-label]="'Ver factura ' + invoice.number">Ver factura</button>
+                    } @else { <a
                       [routerLink]="getInvoiceDetailPath(invoice.id)"
                     >
                       Ver factura
-                    </a>
+                    </a> }
                   </td>
                 </tr>
               }
             </tbody>
           </table>
+          </div>
 
           <nav aria-label="Paginación de facturas">
             <button
@@ -192,10 +182,16 @@ interface BillingInvoiceListItem {
           </nav>
         }
       </section>
-    </main>
+    </section>
   `,
 })
 export class BillingListPageComponent {
+  @Input() composed = false;
+  @Output() readonly openInvoice = new EventEmitter<string>();
+  readonly statusLabels: Record<InvoiceListStatus, string> = {
+    DRAFT: 'Borrador', ISSUED: 'Emitida', PARTIALLY_PAID: 'Pago parcial',
+    PAID: 'Pagada', CANCELLED: 'Cancelada',
+  };
   readonly monthlyIncome = 250000;
   readonly pendingInvoices = 2;
   readonly paidInvoices = 1;
@@ -206,31 +202,9 @@ export class BillingListPageComponent {
   selectedStatus: BillingInvoiceStatusFilter = 'ALL';
   currentPage = 1;
 
-  readonly invoices: BillingInvoiceListItem[] = [
-    {
-      id: 'invoice-001',
-      number: 'INV-001',
-      patientName: 'Paciente de demostración',
-      amount: 130000,
-      status: 'PARTIAL',
-    },
-    {
-      id: 'invoice-002',
-      number: 'INV-002',
-      patientName: 'Paciente de demostración 2',
-      amount: 120000,
-      status: 'ISSUED',
-    },
-    {
-      id: 'invoice-003',
-      number: 'INV-003',
-      patientName: 'Paciente de demostración 3',
-      amount: 250000,
-      status: 'PAID',
-    },
-  ];
+  @Input() invoices: InvoiceListItem[] = [];
 
-  get filteredInvoices(): BillingInvoiceListItem[] {
+  get filteredInvoices(): InvoiceListItem[] {
     const normalizedSearchTerm =
       this.searchTerm
         .trim()
@@ -263,7 +237,7 @@ export class BillingListPageComponent {
     );
   }
 
-  get paginatedInvoices(): BillingInvoiceListItem[] {
+  get paginatedInvoices(): InvoiceListItem[] {
     const startIndex =
       (this.currentPage - 1) * this.pageSize;
 
@@ -283,7 +257,7 @@ export class BillingListPageComponent {
       'ALL',
       'DRAFT',
       'ISSUED',
-      'PARTIAL',
+      'PARTIALLY_PAID',
       'PAID',
       'CANCELLED',
     ];

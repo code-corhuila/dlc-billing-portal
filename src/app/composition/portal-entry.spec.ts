@@ -129,7 +129,7 @@ it('rejects route updates and leaving after disposal', async () => {
   expect(await handle.canLeave()).toBe(false);
 });
 
-it('provides an unavailable frame at the root and a 404 for unknown local paths', async () => {
+it('selects the dummy invoice list at the root and a 404 for unknown local paths', async () => {
   const { BILLING_CONTEXT, BillingCompositionRoot } =
     await import('./billing-root.component');
   const injector = Injector.create({
@@ -137,12 +137,61 @@ it('provides an unavailable frame at the root and a 404 for unknown local paths'
   });
   const frame = runInInjectionContext(injector, () => new BillingCompositionRoot());
   expect(frame.title()).toBe('Facturación');
-  expect(frame.message()).toBe('La integración de Billing no está disponible.');
+  expect(frame.isInvoiceList()).toBe(true);
+  expect(frame.invoices).toHaveLength(3);
   frame.route.set(route('/missing'));
+  expect(frame.isInvoiceList()).toBe(false);
   expect(frame.title()).toBe('Página no encontrada');
   expect(frame.message()).toBe('La ruta solicitada no está disponible en Billing.');
   injector.destroy();
 });
+
+it('requests invoice navigation through the compositor and handles refusal or failure', async () => {
+  const { BILLING_CONTEXT, BillingCompositionRoot } = await import('./billing-root.component');
+  const capabilities = context();
+  const injector = Injector.create({ providers: [{ provide: BILLING_CONTEXT, useValue: capabilities }] });
+  const frame = runInInjectionContext(injector, () => new BillingCompositionRoot());
+  capabilities.navigation.request.mockResolvedValue({ status: 'applied' });
+  await frame.openInvoice('invoice-001');
+  expect(capabilities.navigation.request).toHaveBeenCalledWith({ path: '/app/billing/invoices/invoice-001' });
+  capabilities.navigation.request.mockResolvedValue({ status: 'cancelled' });
+  await frame.openInvoice('invoice-002');
+  expect(frame.navigationMessage()).not.toBe('');
+  capabilities.navigation.request.mockRejectedValue(new Error('private details'));
+  await frame.openInvoice('invoice-002');
+  expect(capabilities.reportFailure).toHaveBeenCalledWith({ code: 'PORTAL_TASK_FAILED' });
+  expect(frame.navigationMessage()).not.toContain('private details');
+  controller.abort();
+  capabilities.navigation.request.mockClear();
+  await frame.openInvoice('invoice-001');
+  expect(capabilities.navigation.request).not.toHaveBeenCalled();
+  injector.destroy();
+});
+
+it.each(['cancelled', 'rejected', 'failure'] as const)(
+  'ignores late navigation %s after context cancellation (regression)', async outcome => {
+    const { BILLING_CONTEXT, BillingCompositionRoot } = await import('./billing-root.component');
+    const capabilities = context();
+    let resolve!: (value: { status: 'cancelled' | 'rejected' }) => void;
+    let reject!: (error: Error) => void;
+    capabilities.navigation.request.mockReturnValue(new Promise((res, rej) => {
+      resolve = res; reject = rej;
+    }));
+    const injector = Injector.create({ providers: [{ provide: BILLING_CONTEXT, useValue: capabilities }] });
+    try {
+      const frame = runInInjectionContext(injector, () => new BillingCompositionRoot());
+      const writes = vi.spyOn(frame.navigationMessage, 'set');
+      const pending = frame.openInvoice('invoice-001');
+      writes.mockClear();
+      controller.abort();
+      if (outcome === 'failure') reject(new Error('private late failure'));
+      else resolve({ status: outcome });
+      await pending;
+      expect(writes).not.toHaveBeenCalled();
+      expect(capabilities.reportFailure).not.toHaveBeenCalled();
+    } finally { injector.destroy(); }
+  },
+);
 
 it('preserves cleanup rejection for the compositor after forced cancellation', async () => {
   const handle = await mount();
@@ -154,6 +203,29 @@ it('preserves cleanup rejection for the compositor after forced cancellation', a
   expect(child.remove).toHaveBeenCalledTimes(1);
 });
 
+it.each(['response', 'failure'])('ignores late navigation %s after destruction with a live signal', async outcome => {
+  const { BILLING_CONTEXT, BillingCompositionRoot } = await import('./billing-root.component');
+  const capabilities = context();
+  let settle!: () => void;
+  capabilities.navigation.request.mockReturnValue(new Promise((resolve, reject) => {
+    settle = () => outcome === 'failure' ? reject(new Error('late failure')) : resolve({ status: 'cancelled' });
+  }));
+  const injector = Injector.create({ providers: [{ provide: BILLING_CONTEXT, useValue: capabilities }] });
+  const frame = runInInjectionContext(injector, () => new BillingCompositionRoot());
+  const writes = vi.spyOn(frame.navigationMessage, 'set');
+  const pending = frame.openInvoice('invoice-001');
+  writes.mockClear();
+  injector.destroy();
+  expect(controller.signal.aborted).toBe(false);
+  settle();
+  await pending;
+  expect(writes).not.toHaveBeenCalled();
+  expect(capabilities.reportFailure).not.toHaveBeenCalled();
+  capabilities.navigation.request.mockClear();
+  await frame.openInvoice('invoice-001');
+  expect(capabilities.navigation.request).not.toHaveBeenCalled();
+});
+
 it('reports only a safe render failure code (regression)', async () => {
   const capabilities = context();
   const { mount } = await import('../../portal-entry');
@@ -163,4 +235,25 @@ it('reports only a safe render failure code (regression)', async () => {
     && p.provide === ErrorHandler) as { useValue: { handleError: (error: Error) => void } };
   provider.useValue.handleError(new Error('private content'));
   expect(capabilities.reportFailure).toHaveBeenCalledWith({ code: 'PORTAL_RENDER_FAILED' });
+});
+
+it.each(['cancelled', 'failure'])('deduplicates pending targets and ignores superseded navigation %s', async outcome => {
+  const { BILLING_CONTEXT, BillingCompositionRoot } = await import('./billing-root.component');
+  const capabilities = context();
+  let settle!: () => void;
+  capabilities.navigation.request.mockReturnValueOnce(new Promise((resolve, reject) => {
+    settle = () => outcome === 'failure' ? reject(new Error('obsolete failure')) : resolve({ status: 'cancelled' });
+  })).mockResolvedValueOnce({ status: 'applied' });
+  const injector = Injector.create({ providers: [{ provide: BILLING_CONTEXT, useValue: capabilities }] });
+  try {
+    const frame = runInInjectionContext(injector, () => new BillingCompositionRoot());
+    const old = frame.openInvoice('invoice-001');
+    await frame.openInvoice('invoice-001');
+    expect(capabilities.navigation.request).toHaveBeenCalledTimes(1);
+    await frame.openInvoice('invoice-002');
+    expect(capabilities.navigation.request).toHaveBeenCalledTimes(2);
+    settle(); await old;
+    expect(frame.navigationMessage()).toBe('');
+    expect(capabilities.reportFailure).not.toHaveBeenCalled();
+  } finally { injector.destroy(); }
 });
