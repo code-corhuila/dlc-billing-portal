@@ -32,13 +32,27 @@ it('selects details through the configured source and reacts to compositor route
   } finally { injector.destroy(); }
 });
 
-it.each(['/invoices/missing', '/invoices/invoice-001/payment', '/invoices/%ZZ', '/missing'])(
+it.each(['/invoices/missing', '/invoices/%ZZ', '/missing'])(
   'does not substitute a fixed invoice for unavailable route %s', localPath => {
     const { frame, injector } = setup(localPath);
     try { expect(frame.selectedInvoice()).toBeUndefined(); }
     finally { injector.destroy(); }
   },
 );
+
+it('selects payment routes and requests payment navigation through the compositor', async () => {
+  const { frame, injector, context } = setup('/invoices/invoice-001/payment');
+  try {
+    frame.session.set({ state: 'authenticated', user: { roles: ['SECRETARY_ASSISTANT'] } } as never);
+    expect(frame.isPaymentRoute()).toBe(true); expect(frame.isInvoiceDetail()).toBe(false);
+    expect(frame.canRecordPayments()).toBe(true);
+    await frame.openPayment('invoice-001');
+    expect(context.navigation.request).toHaveBeenCalledWith({ path: '/app/billing/invoices/invoice-001/payment' });
+    frame.payments.register('invoice-001', '100000.00', 'demo', 'key');
+    expect(frame.selectedInvoice()?.status).toBe('PAID');
+    expect(frame.invoices[0].status).toBe('PAID');
+  } finally { injector.destroy(); }
+});
 
 it('decodes identifiers once and keeps replacement data independent of demo fixture ids', () => {
   const { frame, source, injector } = setup('/invoices/custom%20id');
