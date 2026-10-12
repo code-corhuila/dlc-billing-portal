@@ -1,10 +1,11 @@
 import { Routes } from '@angular/router';
-import { dummyInvoiceList } from './data/invoice-list.dummy';
+import { inject } from '@angular/core';
+import { INVOICE_LIST_SOURCE } from './data/invoice-list-source';
 
 export const BILLING_ROUTES: Routes = [
   {
     path: '',
-    resolve: { invoices: () => dummyInvoiceList.read() },
+    resolve: { invoices: () => inject(INVOICE_LIST_SOURCE).read() },
     loadComponent: () =>
       import(
         './pages/billing-list-page.component'

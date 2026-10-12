@@ -9,6 +9,7 @@ import {
 
 import { BillingListPageComponent } from './billing-list-page.component';
 import { dummyInvoiceList } from '../data/invoice-list.dummy';
+import { copMoney } from '../model/cop-money';
 
 describe('BillingListPageComponent', () => {
   let component: BillingListPageComponent;
@@ -20,7 +21,7 @@ describe('BillingListPageComponent', () => {
     expect(new BillingListPageComponent().invoices).toEqual([]);
   });
   it('uses supplied invoice rows instead of default fixtures (regression)', () => {
-    component.invoices = [{ id: 'external-demo', number: 'DEMO-42', patientName: 'Demo', amount: 50000, status: 'ISSUED' }];
+    component.invoices = [{ id: 'external-demo', number: 'DEMO-42', patientName: 'Demo', amount: copMoney('50000.00'), status: 'ISSUED' }];
     component.updateSearchTerm('DEMO-42');
     expect(component.paginatedInvoices.map(i => i.id)).toEqual(['external-demo']);
     expect(component.totalPages).toBe(1);
@@ -33,7 +34,7 @@ describe('BillingListPageComponent', () => {
   });
   it('exposes the billing summary metrics', () => {
 
-    expect(component.monthlyIncome).toBe(250000);
+    expect(component.monthlyIncome).toBe('250000.00');
     expect(component.pendingInvoices).toBe(2);
     expect(component.paidInvoices).toBe(1);
   });
@@ -46,7 +47,7 @@ describe('BillingListPageComponent', () => {
       id: 'invoice-001',
       number: 'INV-001',
       patientName: 'Paciente de demostración',
-      amount: 130000,
+      amount: '130000.00',
       status: 'PARTIALLY_PAID',
     });
   });
@@ -55,10 +56,10 @@ describe('BillingListPageComponent', () => {
     component.updateSelectedStatus('PARTIALLY_PAID');
     expect(component.selectedStatus).toBe('PARTIALLY_PAID');
     expect(component.filteredInvoices.map(i => i.id)).toEqual(['invoice-001']);
-    component.invoices[0].amount = 1;
+    component.invoices[0].amount = copMoney('1.00');
     const other = new BillingListPageComponent();
     other.invoices = dummyInvoiceList.read();
-    expect(other.invoices[0].amount).toBe(130000);
+    expect(other.invoices[0].amount).toBe('130000.00');
   });
 
   it('filters invoices by invoice number or patient name', () => {

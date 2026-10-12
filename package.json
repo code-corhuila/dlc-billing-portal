@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "build": "ng build",
+    "contract:check": "node scripts/invoice-contract.mjs --check",
     "build:portal": "node scripts/build-portal.mjs",
     "serve:portal": "node scripts/serve-portal.mjs",
     "start": "ng run dlc-billing-portal:serve-original",
@@ -29,6 +30,7 @@
     "@angular/cli": "^21.0.0",
     "@angular/compiler-cli": "^21.0.0",
     "@vitest/coverage-v8": "4.1.11",
+    "js-yaml": "4.3.2",
     "typescript": "~5.9.0",
     "vitest": "^4.0.0"
   },

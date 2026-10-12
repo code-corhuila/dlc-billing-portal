@@ -1,12 +1,16 @@
 import { describe, expect, it } from 'vitest';
 
 import { BILLING_ROUTES } from './billing.routes';
+import { Injector, runInInjectionContext } from '@angular/core';
+import { provideInvoiceListSource } from './data/invoice-list-source';
 
 describe('billing routes', () => {
   it('supplies fictional invoice rows at the standalone route boundary', () => {
     const route = BILLING_ROUTES.find(route => route.path === '');
     expect(typeof route?.resolve?.['invoices']).toBe('function');
-    const rows = (route!.resolve!['invoices'] as () => { id: string }[])();
+    const injector = Injector.create({ providers: [provideInvoiceListSource()] });
+    const rows = runInInjectionContext(injector, route!.resolve!['invoices'] as () => { id: string }[]);
+    injector.destroy();
     expect(rows.map(row => row.id)).toEqual(['invoice-001', 'invoice-002', 'invoice-003']);
   });
   it('exposes the billing list as the feature root route', () => {

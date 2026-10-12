@@ -2,6 +2,7 @@ import '@angular/compiler';
 import { createApplication } from '@angular/platform-browser';
 import { ErrorHandler, Injector, runInInjectionContext, signal } from '@angular/core';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { provideInvoiceListSource } from '../billing/data/invoice-list-source';
 
 vi.mock('@angular/platform-browser', () => ({ createApplication: vi.fn() }));
 
@@ -133,7 +134,7 @@ it('selects the dummy invoice list at the root and a 404 for unknown local paths
   const { BILLING_CONTEXT, BillingCompositionRoot } =
     await import('./billing-root.component');
   const injector = Injector.create({
-    providers: [{ provide: BILLING_CONTEXT, useValue: context() }],
+    providers: [provideInvoiceListSource(), { provide: BILLING_CONTEXT, useValue: context() }],
   });
   const frame = runInInjectionContext(injector, () => new BillingCompositionRoot());
   expect(frame.title()).toBe('Facturación');
@@ -149,7 +150,7 @@ it('selects the dummy invoice list at the root and a 404 for unknown local paths
 it('requests invoice navigation through the compositor and handles refusal or failure', async () => {
   const { BILLING_CONTEXT, BillingCompositionRoot } = await import('./billing-root.component');
   const capabilities = context();
-  const injector = Injector.create({ providers: [{ provide: BILLING_CONTEXT, useValue: capabilities }] });
+  const injector = Injector.create({ providers: [provideInvoiceListSource(), { provide: BILLING_CONTEXT, useValue: capabilities }] });
   const frame = runInInjectionContext(injector, () => new BillingCompositionRoot());
   capabilities.navigation.request.mockResolvedValue({ status: 'applied' });
   await frame.openInvoice('invoice-001');
@@ -177,7 +178,7 @@ it.each(['cancelled', 'rejected', 'failure'] as const)(
     capabilities.navigation.request.mockReturnValue(new Promise((res, rej) => {
       resolve = res; reject = rej;
     }));
-    const injector = Injector.create({ providers: [{ provide: BILLING_CONTEXT, useValue: capabilities }] });
+    const injector = Injector.create({ providers: [provideInvoiceListSource(), { provide: BILLING_CONTEXT, useValue: capabilities }] });
     try {
       const frame = runInInjectionContext(injector, () => new BillingCompositionRoot());
       const writes = vi.spyOn(frame.navigationMessage, 'set');
@@ -210,7 +211,7 @@ it.each(['response', 'failure'])('ignores late navigation %s after destruction w
   capabilities.navigation.request.mockReturnValue(new Promise((resolve, reject) => {
     settle = () => outcome === 'failure' ? reject(new Error('late failure')) : resolve({ status: 'cancelled' });
   }));
-  const injector = Injector.create({ providers: [{ provide: BILLING_CONTEXT, useValue: capabilities }] });
+  const injector = Injector.create({ providers: [provideInvoiceListSource(), { provide: BILLING_CONTEXT, useValue: capabilities }] });
   const frame = runInInjectionContext(injector, () => new BillingCompositionRoot());
   const writes = vi.spyOn(frame.navigationMessage, 'set');
   const pending = frame.openInvoice('invoice-001');
@@ -244,7 +245,7 @@ it.each(['cancelled', 'failure'])('deduplicates pending targets and ignores supe
   capabilities.navigation.request.mockReturnValueOnce(new Promise((resolve, reject) => {
     settle = () => outcome === 'failure' ? reject(new Error('obsolete failure')) : resolve({ status: 'cancelled' });
   })).mockResolvedValueOnce({ status: 'applied' });
-  const injector = Injector.create({ providers: [{ provide: BILLING_CONTEXT, useValue: capabilities }] });
+  const injector = Injector.create({ providers: [provideInvoiceListSource(), { provide: BILLING_CONTEXT, useValue: capabilities }] });
   try {
     const frame = runInInjectionContext(injector, () => new BillingCompositionRoot());
     const old = frame.openInvoice('invoice-001');
