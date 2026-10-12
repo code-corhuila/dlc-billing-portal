@@ -1,4 +1,4 @@
-import { Component, DestroyRef, EventEmitter, Input, Output, inject } from '@angular/core';
+import { Component, DestroyRef, ElementRef, EventEmitter, Input, Output, ViewChild, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import type { InvoicePaymentSession } from '../model/invoice-payment-session';
 import { copMoney } from '../model/cop-money';
@@ -9,7 +9,7 @@ import { formatCopMoney } from '../presentation/format-cop-money';
   styleUrl: './invoice-payment-page.component.css',
   template: `<section aria-label="Registrar pago">
     <button type="button" (click)="back.emit()">Volver a facturas</button>
-    <h1 tabindex="-1">Registrar pago</h1>
+    <h1 #paymentHeading tabindex="-1">Registrar pago</h1>
     <p role="note">Datos ficticios, sin persistencia, pasarela, correo ni conexión con Billing API.</p>
     @if (invoice; as selected) {
       <article><h2>{{ selected.number }} · {{ selected.patientName }}</h2>
@@ -36,6 +36,7 @@ import { formatCopMoney } from '../presentation/format-cop-money';
   </section>`,
 })
 export class InvoicePaymentPageComponent {
+  @ViewChild('paymentHeading') paymentHeading?: ElementRef<HTMLElement>;
   @Input() session!: InvoicePaymentSession;
   @Input() invoiceId = '';
   @Input() canPay = false;
@@ -64,6 +65,7 @@ export class InvoicePaymentPageComponent {
       if (this.intent?.fingerprint !== fingerprint) this.intent = { fingerprint, key: crypto.randomUUID() };
       this.session.register(this.invoiceId, this.amount, this.method, this.intent.key);
       this.discard(); this.feedback = 'Pago de demostración registrado correctamente.';
+      this.paymentHeading?.nativeElement.focus();
     } catch { this.feedback = 'No se pudo registrar el pago. Revisa el saldo y el formulario.'; }
   }
   discard(): void { this.amount = ''; this.method = ''; this.feedback = ''; this.intent = undefined; }
