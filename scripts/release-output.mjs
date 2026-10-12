@@ -1,5 +1,6 @@
-import { cpSync, existsSync, mkdirSync, mkdtempSync, renameSync, rmSync, rmdirSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, renameSync, rmSync, rmdirSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
+import { hostname } from 'node:os';
 
 export function publishRelease(root, release, build, copy = cpSync) {
   if (!/^(?!\.+$)[A-Za-z0-9._-]+$/.test(release)) throw new Error('Invalid Billing release');
@@ -16,6 +17,7 @@ export function publishRelease(root, release, build, copy = cpSync) {
     // The lock serializes compilation too: Angular's output directory is shared.
     if (existsSync(target)) throw new Error('Billing release already exists; choose a new release');
     stage = mkdtempSync(join(releases, '.staging-'));
+    writeFileSync(join(lock, 'owner.json'), JSON.stringify({ pid: process.pid, host: hostname(), stage }), { flag: 'wx' });
     build();
     copy(join(root, 'dist/billing-composition'), stage, {
       recursive: true, force: false, errorOnExist: true,
@@ -26,6 +28,9 @@ export function publishRelease(root, release, build, copy = cpSync) {
   } finally {
     try {
       if (stage && dirname(stage) === releases) rmSync(stage, { recursive: true, force: true });
-    } finally { rmdirSync(lock); }
+    } finally {
+      rmSync(join(lock, 'owner.json'), { force: true });
+      rmdirSync(lock);
+    }
   }
 }
