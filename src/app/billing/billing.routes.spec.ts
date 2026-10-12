@@ -3,6 +3,12 @@ import { describe, expect, it } from 'vitest';
 import { BILLING_ROUTES } from './billing.routes';
 
 describe('billing routes', () => {
+  it('supplies fictional invoice rows at the standalone route boundary', () => {
+    const route = BILLING_ROUTES.find(route => route.path === '');
+    expect(typeof route?.resolve?.['invoices']).toBe('function');
+    const rows = (route!.resolve!['invoices'] as () => { id: string }[])();
+    expect(rows.map(row => row.id)).toEqual(['invoice-001', 'invoice-002', 'invoice-003']);
+  });
   it('exposes the billing list as the feature root route', () => {
     const rootRoute = BILLING_ROUTES.find(
       (route) => route.path === '',

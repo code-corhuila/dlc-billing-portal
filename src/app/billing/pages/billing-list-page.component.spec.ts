@@ -2,29 +2,36 @@ import '@angular/compiler';
 
 import {
   describe,
+  beforeEach,
   expect,
   it,
 } from 'vitest';
 
 import { BillingListPageComponent } from './billing-list-page.component';
+import { dummyInvoiceList } from '../data/invoice-list.dummy';
 
 describe('BillingListPageComponent', () => {
+  let component: BillingListPageComponent;
+  beforeEach(() => {
+    component = new BillingListPageComponent();
+    component.invoices = dummyInvoiceList.read();
+  });
+  it('does not choose a data source before receiving rows', () => {
+    expect(new BillingListPageComponent().invoices).toEqual([]);
+  });
   it('uses supplied invoice rows instead of default fixtures (regression)', () => {
-    const component = new BillingListPageComponent();
     component.invoices = [{ id: 'external-demo', number: 'DEMO-42', patientName: 'Demo', amount: 50000, status: 'ISSUED' }];
     component.updateSearchTerm('DEMO-42');
     expect(component.paginatedInvoices.map(i => i.id)).toEqual(['external-demo']);
     expect(component.totalPages).toBe(1);
   });
   it('emits a selected invoice for composed navigation without owning a router', () => {
-    const component = new BillingListPageComponent();
     const selected: string[] = [];
     component.openInvoice.subscribe(id => selected.push(id));
     component.openInvoice.emit('invoice-002');
     expect(selected).toEqual(['invoice-002']);
   });
   it('exposes the billing summary metrics', () => {
-    const component = new BillingListPageComponent();
 
     expect(component.monthlyIncome).toBe(250000);
     expect(component.pendingInvoices).toBe(2);
@@ -32,7 +39,6 @@ describe('BillingListPageComponent', () => {
   });
 
   it('starts with a billing invoice list', () => {
-    const component = new BillingListPageComponent();
 
     expect(component.invoices.length).toBe(3);
 
@@ -46,16 +52,16 @@ describe('BillingListPageComponent', () => {
   });
 
   it('filters the contract partial-payment state and isolates dummy data between instances', () => {
-    const component = new BillingListPageComponent();
     component.updateSelectedStatus('PARTIALLY_PAID');
     expect(component.selectedStatus).toBe('PARTIALLY_PAID');
     expect(component.filteredInvoices.map(i => i.id)).toEqual(['invoice-001']);
     component.invoices[0].amount = 1;
-    expect(new BillingListPageComponent().invoices[0].amount).toBe(130000);
+    const other = new BillingListPageComponent();
+    other.invoices = dummyInvoiceList.read();
+    expect(other.invoices[0].amount).toBe(130000);
   });
 
   it('filters invoices by invoice number or patient name', () => {
-    const component = new BillingListPageComponent();
 
     component.searchTerm = 'INV-002';
 
@@ -69,7 +75,6 @@ describe('BillingListPageComponent', () => {
   });
 
   it('filters invoices by status', () => {
-    const component = new BillingListPageComponent();
 
     component.selectedStatus = 'PAID';
 
@@ -78,7 +83,6 @@ describe('BillingListPageComponent', () => {
   });
 
   it('combines search and status filters', () => {
-    const component = new BillingListPageComponent();
 
     component.searchTerm = 'Paciente';
     component.selectedStatus = 'ISSUED';
@@ -88,7 +92,6 @@ describe('BillingListPageComponent', () => {
   });
 
   it('shows all invoices when no status filter is selected', () => {
-    const component = new BillingListPageComponent();
 
     component.selectedStatus = 'ALL';
 
@@ -96,7 +99,6 @@ describe('BillingListPageComponent', () => {
   });
 
   it('builds the feature-relative invoice detail path', () => {
-    const component = new BillingListPageComponent();
 
     expect(
       component.getInvoiceDetailPath('invoice-002'),
@@ -104,7 +106,6 @@ describe('BillingListPageComponent', () => {
   });
 
   it('starts on the first invoice page', () => {
-    const component = new BillingListPageComponent();
 
     expect(component.currentPage).toBe(1);
     expect(component.pageSize).toBe(2);
@@ -117,7 +118,6 @@ describe('BillingListPageComponent', () => {
   });
 
   it('moves to the next invoice page', () => {
-    const component = new BillingListPageComponent();
 
     component.nextPage();
 
@@ -130,7 +130,6 @@ describe('BillingListPageComponent', () => {
   });
 
   it('does not move past the last invoice page', () => {
-    const component = new BillingListPageComponent();
 
     component.nextPage();
     component.nextPage();
@@ -139,7 +138,6 @@ describe('BillingListPageComponent', () => {
   });
 
   it('moves back to the previous invoice page', () => {
-    const component = new BillingListPageComponent();
 
     component.nextPage();
     component.previousPage();
@@ -148,7 +146,6 @@ describe('BillingListPageComponent', () => {
   });
 
   it('does not move before the first invoice page', () => {
-    const component = new BillingListPageComponent();
 
     component.previousPage();
 
@@ -156,7 +153,6 @@ describe('BillingListPageComponent', () => {
   });
 
   it('returns to the first page when the search changes', () => {
-    const component = new BillingListPageComponent();
 
     component.nextPage();
 
@@ -174,7 +170,6 @@ describe('BillingListPageComponent', () => {
   });
 
   it('returns to the first page when the status filter changes', () => {
-    const component = new BillingListPageComponent();
 
     component.nextPage();
 

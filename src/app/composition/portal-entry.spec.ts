@@ -138,6 +138,7 @@ it('selects the dummy invoice list at the root and a 404 for unknown local paths
   const frame = runInInjectionContext(injector, () => new BillingCompositionRoot());
   expect(frame.title()).toBe('Facturación');
   expect(frame.isInvoiceList()).toBe(true);
+  expect(frame.invoices).toHaveLength(3);
   frame.route.set(route('/missing'));
   expect(frame.isInvoiceList()).toBe(false);
   expect(frame.title()).toBe('Página no encontrada');
