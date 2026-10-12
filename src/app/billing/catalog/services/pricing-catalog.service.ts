@@ -1,4 +1,5 @@
-import { Injectable } from '@angular/core';
+import { Injectable, signal } from '@angular/core';
+import { copMoney } from '../../model/cop-money';
 
 import { PRICING_CATALOG_FIXTURES } from '../data/pricing-catalog.mock';
 import {
@@ -10,6 +11,8 @@ import {
   providedIn: 'root',
 })
 export class PricingCatalogService {
+  // Application-scoped fictional state; never persistent owner records.
+  readonly demoPrices = signal(this.getFixtures());
   getFixtures(): ProcedurePrice[] {
     return PRICING_CATALOG_FIXTURES.map((price) => ({ ...price }));
   }
@@ -18,6 +21,8 @@ export class PricingCatalogService {
     currentPrices: ProcedurePrice[],
     request: CreateProcedurePriceRequest,
   ): ProcedurePrice[] {
+    const amount = copMoney(request.amount);
+    if (BigInt(amount.replace('.', '')) <= 0n) throw new Error('Price must be positive');
     const normalizedCode = request.procedureCode.trim();
     const normalizedName = request.procedureName.trim();
 
@@ -35,7 +40,7 @@ export class PricingCatalogService {
       id: this.generateMockId(),
       procedureCode: normalizedCode,
       procedureName: normalizedName,
-      amount: request.amount,
+      amount,
       currency: 'COP',
       validFrom: request.validFrom,
       version: latestVersion + 1,

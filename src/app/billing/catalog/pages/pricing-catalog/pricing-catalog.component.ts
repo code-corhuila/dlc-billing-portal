@@ -1,5 +1,7 @@
 import { CommonModule } from '@angular/common';
-import { Component, inject, signal } from '@angular/core';
+import { Component, DestroyRef, inject, signal } from '@angular/core';
+import { copMoney, CopMoney } from '../../../model/cop-money';
+import { formatCopMoney } from '../../../presentation/format-cop-money';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 
@@ -24,9 +26,13 @@ export class PricingCatalogComponent {
   private readonly pricingCatalogService =
     inject(PricingCatalogService);
 
-  readonly prices = signal<ProcedurePrice[]>(
-    this.pricingCatalogService.getFixtures(),
-  );
+  readonly prices = this.pricingCatalogService.demoPrices;
+  private readonly destroyRef = inject(DestroyRef);
+  private pendingTimer?: ReturnType<typeof setTimeout>;
+
+  constructor() {
+    this.destroyRef.onDestroy(() => clearTimeout(this.pendingTimer));
+  }
 
   readonly formVisible = signal(false);
   readonly submitting = signal(false);
@@ -60,17 +66,19 @@ export class PricingCatalogComponent {
   }
 
   submitPrice(): void {
-    if (!this.isFormValid()) {
+    if (this.destroyRef.destroyed || this.submitting() || !this.isFormValid()) {
       return;
     }
 
     this.startSubmitting();
+    const request = { ...this.form };
 
-    setTimeout(() => {
+    this.pendingTimer = setTimeout(() => {
+      if (this.destroyRef.destroyed) return;
       const updatedPrices =
         this.pricingCatalogService.createNewVersion(
           this.prices(),
-          this.form,
+          request,
         );
 
       this.prices.set(updatedPrices);
@@ -101,19 +109,20 @@ export class PricingCatalogComponent {
     );
   }
 
-  formatMoney(amount: number): string {
-    return new Intl.NumberFormat('es-CO', {
-      style: 'currency',
-      currency: 'COP',
-      maximumFractionDigits: 0,
-    }).format(amount);
+  formatMoney(amount: CopMoney): string {
+    return `COP ${formatCopMoney(amount)}`;
+  }
+
+  get validAmount(): boolean {
+    try { return BigInt(copMoney(this.form.amount).replace('.', '')) > 0n; }
+    catch { return false; }
   }
 
   private isFormValid(): boolean {
     return (
       this.form.procedureCode.trim().length > 0 &&
       this.form.procedureName.trim().length > 0 &&
-      this.form.amount > 0 &&
+      this.validAmount &&
       this.form.validFrom.length > 0
     );
   }
@@ -147,7 +156,7 @@ export class PricingCatalogComponent {
     return {
       procedureCode: '',
       procedureName: '',
-      amount: 0,
+      amount: '',
       validFrom: '',
     };
   }

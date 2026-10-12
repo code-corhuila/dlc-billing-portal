@@ -259,10 +259,11 @@
               Precio en COP *
             </span>
 
-            <input type="number" name="amount" [(ngModel)]="form.amount" required min="1" [disabled]="submitting()" />
+            <input type="text" inputmode="decimal" name="amount" [(ngModel)]="form.amount" required
+              placeholder="80000.00" [disabled]="submitting()" />
 
-            @if (form.amount <= 0) { <small class="validation-message">
-              El precio debe ser mayor que cero.
+            @if (!validAmount) { <small class="validation-message">
+              Usa un precio positivo con dos decimales y punto, por ejemplo 80000.00.
               </small>
 
               }
@@ -303,7 +304,7 @@
 
           <button type="submit" class="primary-button" [disabled]="
                 priceForm.invalid ||
-                form.amount <= 0 ||
+                !validAmount ||
                 submitting()
               ">
             {{
