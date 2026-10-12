@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, DestroyRef, Input, inject, signal } from '@angular/core';
+import { Component, DestroyRef, ElementRef, Input, ViewChild, inject, signal } from '@angular/core';
 import { copMoney, CopMoney } from '../../../model/cop-money';
 import { formatCopMoney } from '../../../presentation/format-cop-money';
 import { FormsModule } from '@angular/forms';
@@ -23,6 +23,9 @@ import { PricingCatalogService } from '../../services/pricing-catalog.service';
   styleUrl: './pricing-catalog.component.css',
 })
 export class PricingCatalogComponent {
+  @ViewChild('priceDialog') priceDialog?: ElementRef<HTMLDialogElement>;
+  @ViewChild('newPriceButton') newPriceButton?: ElementRef<HTMLButtonElement>;
+  editing = false;
   @Input() composed = false;
   @Input() canManagePrices = true;
   private readonly pricingCatalogService =
@@ -42,22 +45,33 @@ export class PricingCatalogComponent {
   readonly errorMessage = signal('');
 
   searchTerm = '';
+  onlyActive = true;
 
   form: CreateProcedurePriceRequest =
     this.createEmptyForm();
 
   get filteredPrices(): ProcedurePrice[] {
-    return this.pricingCatalogService.filterPrices(
+    const prices = this.pricingCatalogService.filterPrices(
       this.prices(),
       this.searchTerm,
     );
+    return this.onlyActive ? prices.filter(price => price.active) : prices;
   }
 
   openForm(): void {
-    if (!this.canManagePrices || this.submitting()) return;
+    if (!this.canManagePrices || this.submitting() || this.destroyRef.destroyed) return;
     this.clearMessages();
     this.resetForm();
     this.formVisible.set(true);
+    this.editing = false;
+    this.priceDialog?.nativeElement.showModal();
+  }
+
+  openForPrice(price: ProcedurePrice): void {
+    if (!price.active || !this.canManagePrices || this.submitting() || this.destroyRef.destroyed) return;
+    this.openForm();
+    this.editing = true;
+    this.form = { procedureCode: price.procedureCode, procedureName: price.procedureName, amount: price.amount, validFrom: '' };
   }
 
   closeForm(): void {
@@ -66,6 +80,7 @@ export class PricingCatalogComponent {
     }
 
     this.formVisible.set(false);
+    this.priceDialog?.nativeElement.close();
   }
 
   submitPrice(): void {
@@ -139,6 +154,10 @@ export class PricingCatalogComponent {
   private finishSubmitting(): void {
     this.submitting.set(false);
     this.formVisible.set(false);
+    this.priceDialog?.nativeElement.close();
+    const button = this.newPriceButton?.nativeElement;
+    // Apply the completed UI state before focusing; Angular renders disabled asynchronously.
+    if (button) { button.disabled = false; button.focus(); }
 
     this.successMessage.set(
       'Nueva versión de precio registrada correctamente en la demostración.',
