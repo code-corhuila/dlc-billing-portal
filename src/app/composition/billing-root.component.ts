@@ -20,6 +20,8 @@ export const BILLING_CONTEXT = new InjectionToken<PortalContext>('billing.contex
 export class BillingCompositionRoot {
   private readonly context = inject(BILLING_CONTEXT);
   private readonly destroyRef = inject(DestroyRef);
+  private navigationGeneration = 0;
+  private pendingInvoice?: string;
   readonly route = signal(this.context.route);
   readonly invoices = dummyInvoiceList.read();
   readonly isInvoiceList = computed(() => this.route().localPath === '/');
@@ -30,19 +32,23 @@ export class BillingCompositionRoot {
     ? 'La integración de Billing no está disponible.'
     : 'La ruta solicitada no está disponible en Billing.');
   async openInvoice(id: string): Promise<void> {
-    if (this.isInactive()) return;
+    if (this.isInactive() || this.pendingInvoice === id) return;
+    this.pendingInvoice = id;
+    const generation = ++this.navigationGeneration;
     this.navigationMessage.set('');
     try {
       const result = await this.context.navigation.request({
         path: `${this.route().basePath}/invoices/${encodeURIComponent(id)}`,
       });
-      if (!this.isInactive() && result.status !== 'applied') {
+      if (!this.isInactive() && generation === this.navigationGeneration && result.status !== 'applied') {
         this.navigationMessage.set('La navegación no se completó.');
       }
     } catch {
-      if (this.isInactive()) return;
+      if (this.isInactive() || generation !== this.navigationGeneration) return;
       this.navigationMessage.set('No se pudo abrir la factura.');
       this.context.reportFailure({ code: 'PORTAL_TASK_FAILED' });
+    } finally {
+      if (!this.isInactive() && generation === this.navigationGeneration) this.pendingInvoice = undefined;
     }
   }
   private isInactive(): boolean {
