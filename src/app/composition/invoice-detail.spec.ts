@@ -10,7 +10,8 @@ function setup(localPath = '/invoices/invoice-002') {
   const route = { localPath, basePath: '/app/billing' };
   const navigation = { request: vi.fn().mockResolvedValue({ status: 'applied' }) };
   const source = { read: dummyInvoiceList.read, detail: vi.fn(dummyInvoiceList.detail) };
-  const context = { route, navigation, signal: controller.signal, reportFailure: vi.fn() };
+  const context = { route, navigation, signal: controller.signal, reportFailure: vi.fn(),
+    session: { getSnapshot: vi.fn(), subscribe: () => () => {} } };
   const injector = Injector.create({ providers: [provideInvoiceListSource(source),
     { provide: BILLING_CONTEXT, useValue: context }] });
   const frame = runInInjectionContext(injector, () => new BillingCompositionRoot());

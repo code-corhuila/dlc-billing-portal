@@ -11,7 +11,7 @@ const route = (localPath = '/') => ({
   basePath: '/app/billing', localPath, query: {}, fragment: '',
 });
 let controller: AbortController;
-const root = { route: signal(route()) };
+const root = { route: signal(route()), canLeave: vi.fn(() => true) };
 const child = { remove: vi.fn() };
 const host = {
   ownerDocument: { createElement: vi.fn(() => child) }, appendChild: vi.fn(),
@@ -21,13 +21,14 @@ const context = () => ({
   contractVersion: 1 as const, portalId: 'billing' as const,
   mountId: 'mount-1', compositionId: 'composition-1', route: route(),
   signal: controller.signal, navigation: { request: vi.fn() },
-  session: { getSnapshot: vi.fn(), subscribe: vi.fn() },
+  session: { getSnapshot: vi.fn(), subscribe: vi.fn(() => () => {}) },
   http: { request: vi.fn() }, reportFailure: vi.fn(),
 });
 const mount = async () => (await import('../../portal-entry')).mount(host, context());
 
 beforeEach(() => {
   vi.clearAllMocks();
+  root.canLeave.mockReturnValue(true);
   controller = new AbortController();
   root.route.set(route());
   app.bootstrap.mockImplementation(() => ({ instance: root }));
@@ -128,6 +129,15 @@ it('rejects route updates and leaving after disposal', async () => {
   await handle.unmount();
   await expect(handle.updateRoute(route('/missing'))).rejects.toThrow('CANCELLED');
   expect(await handle.canLeave()).toBe(false);
+});
+
+it('delegates the open-form leave guard to the composition root', async () => {
+  const handle = await mount();
+  root.canLeave.mockReturnValue(false);
+  expect(await handle.canLeave()).toBe(false);
+  root.canLeave.mockReturnValue(true);
+  expect(await handle.canLeave()).toBe(true);
+  await handle.unmount();
 });
 
 it('selects the dummy invoice list at the root and a 404 for unknown local paths', async () => {

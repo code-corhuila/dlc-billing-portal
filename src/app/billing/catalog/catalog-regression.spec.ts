@@ -4,9 +4,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PricingCatalogService } from './services/pricing-catalog.service';
 import { PricingCatalogComponent } from './pages/pricing-catalog/pricing-catalog.component';
 import { ExtraChargeRulesComponent } from './pages/extra-charge-rules/extra-charge-rules.component';
+import { copMoney } from '../model/cop-money';
 
 // Regression evidence for existing dummy behavior; these are not API or DOM tests.
-const priceRequest = { procedureCode: 'PROC-001', procedureName: 'Updated price', amount: 90000, validFrom: '2026-10-11' };
+const priceRequest = { procedureCode: 'PROC-001', procedureName: 'Updated price', amount: '90000.00', validFrom: '2026-10-11' };
 const ruleRequest = { code: 'EXTRA-MATERIAL-001', name: 'Updated material', description: 'Dummy charge', type: 'MATERIAL' as const, amount: 25000, validFrom: '2026-10-11' };
 beforeEach(() => vi.useFakeTimers());
 afterEach(() => vi.useRealTimers());
@@ -15,8 +16,8 @@ describe('Pricing service regression', () => {
   const service = new PricingCatalogService();
   it('isolates fixture objects between callers', () => {
     const prices = service.getFixtures();
-    prices[0].amount = 1;
-    expect(service.getFixtures()[0].amount).toBe(80000);
+    prices[0].amount = copMoney('1.00');
+    expect(service.getFixtures()[0].amount).toBe('80000.00');
   });
   it('normalizes search and matches names, codes, empty and missing results', () => {
     const prices = service.getFixtures();
@@ -48,7 +49,7 @@ describe('Pricing page regression', () => {
   it('searches, displays COP amounts and restores empty/error fixture states', () => {
     page.searchTerm = 'proc-001';
     expect(page.filteredPrices).toHaveLength(1);
-    expect(page.formatMoney(80000)).toContain('80.000');
+    expect(page.formatMoney(copMoney('80000.00'))).toContain('80.000');
     page.simulateError();
     expect(page.prices()).toEqual([]);
     expect(page.errorMessage()).not.toBe('');
@@ -57,7 +58,7 @@ describe('Pricing page regression', () => {
     page.restoreFixtures();
     expect(page.prices()).toHaveLength(3);
   });
-  it.each([{ procedureCode: ' ' }, { procedureName: ' ' }, { amount: 0 }, { validFrom: '' }])('rejects invalid price fields %j', invalid => {
+  it.each([{ procedureCode: ' ' }, { procedureName: ' ' }, { amount: '0.00' }, { validFrom: '' }])('rejects invalid price fields %j', invalid => {
     page.form = { ...priceRequest, ...invalid };
     page.submitPrice();
     expect(page.submitting()).toBe(false);
@@ -74,10 +75,10 @@ describe('Pricing page regression', () => {
     vi.advanceTimersByTime(900);
     expect(page.submitting()).toBe(false);
     expect(page.formVisible()).toBe(false);
-    expect(page.prices()[0]).toMatchObject({ version: 2, amount: 90000 });
+    expect(page.prices()[0]).toMatchObject({ version: 2, amount: '90000.00' });
     expect(page.successMessage()).not.toBe('');
     page.openForm();
-    expect(page.form.amount).toBe(0);
+    expect(page.form.amount).toBe('');
     expect(page.successMessage()).toBe('');
     page.closeForm();
     expect(page.formVisible()).toBe(false);

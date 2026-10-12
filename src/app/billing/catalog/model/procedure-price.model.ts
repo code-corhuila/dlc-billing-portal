@@ -1,8 +1,10 @@
+import type { CopMoney } from '../../model/cop-money';
+
 export interface ProcedurePrice {
   id: string;
   procedureCode: string;
   procedureName: string;
-  amount: number;
+  amount: CopMoney;
   currency: 'COP';
   validFrom: string;
   version: number;
@@ -12,6 +14,6 @@ export interface ProcedurePrice {
 export interface CreateProcedurePriceRequest {
   procedureCode: string;
   procedureName: string;
-  amount: number;
+  amount: string;
   validFrom: string;
 }
