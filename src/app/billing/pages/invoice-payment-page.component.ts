@@ -41,6 +41,7 @@ export class InvoicePaymentPageComponent {
   @Input() canPay = false;
   @Output() readonly back = new EventEmitter<void>();
   private readonly destroyRef = inject(DestroyRef);
+  private intent?: { fingerprint: string; key: string };
   amount = ''; method = ''; feedback = '';
   readonly format = formatCopMoney;
   get invoice() { return this.session.detail(this.invoiceId); }
@@ -58,9 +59,11 @@ export class InvoicePaymentPageComponent {
   submit(): void {
     if (!this.canSubmit) return;
     try {
-      this.session.register(this.invoiceId, this.amount, this.method, crypto.randomUUID());
+      const fingerprint = JSON.stringify([this.invoiceId, this.amount, this.method.trim()]);
+      if (this.intent?.fingerprint !== fingerprint) this.intent = { fingerprint, key: crypto.randomUUID() };
+      this.session.register(this.invoiceId, this.amount, this.method, this.intent.key);
       this.discard(); this.feedback = 'Pago de demostración registrado correctamente.';
     } catch { this.feedback = 'No se pudo registrar el pago. Revisa el saldo y el formulario.'; }
   }
-  discard(): void { this.amount = ''; this.method = ''; this.feedback = ''; }
+  discard(): void { this.amount = ''; this.method = ''; this.feedback = ''; this.intent = undefined; }
 }
