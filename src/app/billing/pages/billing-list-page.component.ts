@@ -1,7 +1,8 @@
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import type { InvoiceListItem, InvoiceListStatus } from '../model/invoice-list-item';
-import { copMoney, formatCopMoney } from '../domain/cop-money';
+import { copMoney } from '../model/cop-money';
+import { formatCopMoney } from '../presentation/format-cop-money';
 import { INVOICE_STATUSES } from '../model/invoice-contract.generated';
 type BillingInvoiceStatusFilter = 'ALL' | InvoiceListStatus;
 

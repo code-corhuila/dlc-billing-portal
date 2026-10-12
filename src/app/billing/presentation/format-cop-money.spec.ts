@@ -1,5 +1,6 @@
 import { expect, it } from 'vitest';
-import { copMoney, formatCopMoney } from '../domain/cop-money';
+import { copMoney } from '../model/cop-money';
+import { formatCopMoney } from './format-cop-money';
 
 it.each([
   ['es-CO', '130.000,01'], ['en-US', '130,000.01'],

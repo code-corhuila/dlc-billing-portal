@@ -9,7 +9,7 @@ import {
 
 import { BillingListPageComponent } from './billing-list-page.component';
 import { dummyInvoiceList } from '../data/invoice-list.dummy';
-import { copMoney } from '../domain/cop-money';
+import { copMoney } from '../model/cop-money';
 
 describe('BillingListPageComponent', () => {
   let component: BillingListPageComponent;

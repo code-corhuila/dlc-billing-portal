@@ -1,4 +1,4 @@
-import { copMoney } from '../domain/cop-money';
+import { copMoney } from '../model/cop-money';
 import type { InvoiceListItem } from '../model/invoice-list-item';
 import type { InvoiceListSource } from './invoice-list-source';
 

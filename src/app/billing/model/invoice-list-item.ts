@@ -1,4 +1,4 @@
-import type { CopMoney } from '../domain/cop-money';
+import type { CopMoney } from './cop-money';
 import type { InvoiceStatus } from './invoice-contract.generated';
 
 export type InvoiceListStatus = InvoiceStatus;
