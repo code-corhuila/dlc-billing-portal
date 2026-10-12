@@ -1,4 +1,4 @@
-import { Component, InjectionToken, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, InjectionToken, computed, inject, signal } from '@angular/core';
 import { PortalContext } from '../shell-contract';
 import { BillingListPageComponent } from '../billing/pages/billing-list-page.component';
 
@@ -18,6 +18,7 @@ export const BILLING_CONTEXT = new InjectionToken<PortalContext>('billing.contex
 })
 export class BillingCompositionRoot {
   private readonly context = inject(BILLING_CONTEXT);
+  private readonly destroyRef = inject(DestroyRef);
   readonly route = signal(this.context.route);
   readonly isInvoiceList = computed(() => this.route().localPath === '/');
   readonly navigationMessage = signal('');
@@ -27,19 +28,22 @@ export class BillingCompositionRoot {
     ? 'La integración de Billing no está disponible.'
     : 'La ruta solicitada no está disponible en Billing.');
   async openInvoice(id: string): Promise<void> {
-    if (this.context.signal.aborted) return;
+    if (this.isInactive()) return;
     this.navigationMessage.set('');
     try {
       const result = await this.context.navigation.request({
         path: `${this.route().basePath}/invoices/${encodeURIComponent(id)}`,
       });
-      if (!this.context.signal.aborted && result.status !== 'applied') {
+      if (!this.isInactive() && result.status !== 'applied') {
         this.navigationMessage.set('La navegación no se completó.');
       }
     } catch {
-      if (this.context.signal.aborted) return;
+      if (this.isInactive()) return;
       this.navigationMessage.set('No se pudo abrir la factura.');
       this.context.reportFailure({ code: 'PORTAL_TASK_FAILED' });
     }
+  }
+  private isInactive(): boolean {
+    return this.context.signal.aborted || this.destroyRef.destroyed;
   }
 }
