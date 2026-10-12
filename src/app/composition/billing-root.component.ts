@@ -12,8 +12,8 @@ export const BILLING_CONTEXT = new InjectionToken<PortalContext>('billing.contex
     <dlc-billing-list-page [composed]="true" (openInvoice)="openInvoice($event)" />
     <p role="status">{{ navigationMessage() }}</p>
   } @else {
-    <main aria-label="Billing"><h1 tabindex="-1">{{ title() }}</h1>
-      <p role="status">{{ message() }}</p></main>
+    <section aria-label="Billing"><h1 tabindex="-1">{{ title() }}</h1>
+      <p role="status">{{ message() }}</p></section>
   }`,
 })
 export class BillingCompositionRoot {
