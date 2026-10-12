@@ -1,7 +1,7 @@
 import { Component, DestroyRef, InjectionToken, computed, inject, signal } from '@angular/core';
 import { PortalContext } from '../shell-contract';
 import { BillingListPageComponent } from '../billing/pages/billing-list-page.component';
-import { dummyInvoiceList } from '../billing/data/invoice-list.dummy';
+import { INVOICE_LIST_SOURCE } from '../billing/data/invoice-list-source';
 
 export const BILLING_CONTEXT = new InjectionToken<PortalContext>('billing.context');
 
@@ -23,7 +23,7 @@ export class BillingCompositionRoot {
   private navigationGeneration = 0;
   private pendingInvoice?: string;
   readonly route = signal(this.context.route);
-  readonly invoices = dummyInvoiceList.read();
+  readonly invoices = inject(INVOICE_LIST_SOURCE).read();
   readonly isInvoiceList = computed(() => this.route().localPath === '/');
   readonly navigationMessage = signal('');
   readonly title = computed(() => this.route().localPath === '/'
