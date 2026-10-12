@@ -6,7 +6,7 @@ export interface InvoiceListItem {
   amount: number;
   status: InvoiceListStatus;
 }
-export interface InvoiceListSource { read(): InvoiceListItem[]; }
+import type { InvoiceListSource } from './invoice-list-source';
 
 // Synchronous fictional data, not owner responses or persistent financial records.
 const fixtures: InvoiceListItem[] = [

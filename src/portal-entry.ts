@@ -2,6 +2,7 @@ import { ApplicationRef, ErrorHandler, provideZonelessChangeDetection } from '@a
 import { createApplication } from '@angular/platform-browser';
 import { BILLING_CONTEXT, BillingCompositionRoot } from './app/composition/billing-root.component';
 import { PortalContext, PortalHandle } from './app/shell-contract';
+import { provideInvoiceListSource } from './app/billing/data/invoice-list-source';
 
 export const portalId = 'billing';
 export const contractVersion = 1;
@@ -30,6 +31,7 @@ export async function mount(
   try {
     application = await createApplication({ providers: [
       provideZonelessChangeDetection(),
+      provideInvoiceListSource(),
       { provide: BILLING_CONTEXT, useValue: context },
       { provide: ErrorHandler, useValue: {
         handleError: () => context.reportFailure({ code: 'PORTAL_RENDER_FAILED' }),
