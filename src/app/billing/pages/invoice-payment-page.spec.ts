@@ -45,6 +45,8 @@ it('denies invalid, unauthorized and disposed submissions and permits explicit d
   page.amount = '1.00'; page.method = 'demo'; page.submit(); expect(page.history).toEqual([]);
   page.canPay = true; page.amount = '100000.01'; expect(page.canSubmit).toBe(false);
   page.discard(); expect(page.dirty).toBe(false);
+  page.invoiceId = 'invoice-002'; page.amount = '59999.99'; page.method = 'demo'; expect(page.canSubmit).toBe(false);
+  page.amount = '60000.00'; expect(page.canSubmit).toBe(true);
   page.invoiceId = 'missing'; expect(page.invoice).toBeUndefined();
   page.invoiceId = 'invoice-001'; page.amount = '1.00'; page.method = 'demo';
   injector.destroy(); page.submit(); expect(page.history).toEqual([]);

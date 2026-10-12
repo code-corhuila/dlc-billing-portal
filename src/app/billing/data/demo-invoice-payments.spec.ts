@@ -1,6 +1,19 @@
 import { expect, it } from 'vitest';
 import { DemoInvoicePayments } from './demo-invoice-payments';
 import { dummyInvoiceList } from './invoice-list.dummy';
+import { copMoney } from '../model/cop-money';
+
+it('requires half the invoice total only for the first payment, rounding fractional cents upward', () => {
+  const session = new DemoInvoicePayments(dummyInvoiceList);
+  expect(() => session.register('invoice-002', '59999.99', 'demo', 'low')).toThrow();
+  session.register('invoice-002', '60000.00', 'demo', 'half');
+  session.register('invoice-002', '0.01', 'demo', 'next');
+  expect(session.detail('invoice-002')?.balance).toBe('59999.99');
+  const tiny = new DemoInvoicePayments({ read: dummyInvoiceList.read,
+    detail: id => ({ ...dummyInvoiceList.detail(id)!, amount: copMoney('0.03'), paidTotal: copMoney('0.00') }) });
+  expect(() => tiny.register('invoice-002', '0.01', 'demo', 'low')).toThrow();
+  tiny.register('invoice-002', '0.02', 'demo', 'half');
+});
 
 it('records exact partial and final payments without changing initial fixtures', () => {
   const session = new DemoInvoicePayments(dummyInvoiceList);

@@ -5,6 +5,11 @@ Baseline: `e23adba` (merged PR #37). No workflow or deployment configuration cha
 
 ## Scope and authority
 
+Owner clarification for this demo: the first payment must cover at least 50% of the
+invoice total including extras, rounded upward to a cent. Subsequent positive payments
+may settle the remaining balance. This extends the demo policy; the owner API contract
+does not yet specify that minimum and must be aligned before real integration.
+
 HU-BIL-003, Billing OpenAPI payment operation/API-FIN-01, and monetary-calculation.md
 require positive exact COP payments not above balance, payable ISSUED/PARTIALLY_PAID
 states and partial/paid transitions. ADR-011/composition C01-C06 retain shell navigation,
