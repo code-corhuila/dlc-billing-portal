@@ -34,9 +34,12 @@ export class DemoInvoicePayments implements InvoicePaymentSession {
     }
     const invoice = this.detail(id);
     if (!invoice || !['ISSUED', 'PARTIALLY_PAID'].includes(invoice.status)) throw new Error('Demo invoice not payable');
-    if (!key || !method || method.length > 40 || cents(amount) <= 0n || cents(amount) > cents(invoice.balance)) {
+    this.validate(amount, method, key, invoice.balance);
+    this.payments.update(payments => [...payments, { invoiceId: id, amount, method, key }]);
+  }
+  private validate(amount: string, method: string, key: string, balance: string): void {
+    if (!key || !method || method.length > 40 || cents(amount) <= 0n || cents(amount) > cents(balance)) {
       throw new Error('Invalid demo payment');
     }
-    this.payments.update(payments => [...payments, { invoiceId: id, amount, method, key }]);
   }
 }

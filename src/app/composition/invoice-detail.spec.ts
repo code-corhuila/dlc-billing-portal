@@ -4,6 +4,7 @@ import { expect, it, vi } from 'vitest';
 import { BILLING_CONTEXT, BillingCompositionRoot } from './billing-root.component';
 import { provideInvoiceListSource } from '../billing/data/invoice-list-source';
 import { dummyInvoiceList } from '../billing/data/invoice-list.dummy';
+import { InvoicePaymentPageComponent } from '../billing/pages/invoice-payment-page.component';
 
 function setup(localPath = '/invoices/invoice-002') {
   const controller = new AbortController();
@@ -51,6 +52,11 @@ it('selects payment routes and requests payment navigation through the composito
     frame.payments.register('invoice-001', '100000.00', 'demo', 'key');
     expect(frame.selectedInvoice()?.status).toBe('PAID');
     expect(frame.invoices[0].status).toBe('PAID');
+    const page = runInInjectionContext(injector, () => new InvoicePaymentPageComponent());
+    vi.spyOn(frame, 'paymentPage').mockReturnValue(page);
+    page.amount = '1.00';
+    expect(frame.canLeave()).toBe(false);
+    page.discard(); expect(frame.canLeave()).toBe(true);
   } finally { injector.destroy(); }
 });
 
