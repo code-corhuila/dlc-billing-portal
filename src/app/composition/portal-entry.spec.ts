@@ -236,3 +236,24 @@ it('reports only a safe render failure code (regression)', async () => {
   provider.useValue.handleError(new Error('private content'));
   expect(capabilities.reportFailure).toHaveBeenCalledWith({ code: 'PORTAL_RENDER_FAILED' });
 });
+
+it.each(['cancelled', 'failure'])('deduplicates pending targets and ignores superseded navigation %s', async outcome => {
+  const { BILLING_CONTEXT, BillingCompositionRoot } = await import('./billing-root.component');
+  const capabilities = context();
+  let settle!: () => void;
+  capabilities.navigation.request.mockReturnValueOnce(new Promise((resolve, reject) => {
+    settle = () => outcome === 'failure' ? reject(new Error('obsolete failure')) : resolve({ status: 'cancelled' });
+  })).mockResolvedValueOnce({ status: 'applied' });
+  const injector = Injector.create({ providers: [{ provide: BILLING_CONTEXT, useValue: capabilities }] });
+  try {
+    const frame = runInInjectionContext(injector, () => new BillingCompositionRoot());
+    const old = frame.openInvoice('invoice-001');
+    await frame.openInvoice('invoice-001');
+    expect(capabilities.navigation.request).toHaveBeenCalledTimes(1);
+    await frame.openInvoice('invoice-002');
+    expect(capabilities.navigation.request).toHaveBeenCalledTimes(2);
+    settle(); await old;
+    expect(frame.navigationMessage()).toBe('');
+    expect(capabilities.reportFailure).not.toHaveBeenCalled();
+  } finally { injector.destroy(); }
+});
