@@ -1,65 +1,34 @@
 # HU-BIL-002 composed invoice-list demo
 
 Related issue: code-corhuila/dlc-billing-portal#3; HU: code-corhuila/dlc-docs#64.
-Base: develop `1ddce33`. This is an enabling Cut 2 fixture increment, not HU acceptance.
-Specifications: ADR-011; frontend-composition.md C02-C04; design-system.md;
-Billing OpenAPI GET /api/v1/invoices and canonical PARTIALLY_PAID vocabulary.
-No domain API is called; owner authorization, persistence and financial rules are not proven.
+Base: develop `1ddce33`. This is a Cut 2 fixture increment, not HU acceptance.
+Contracts: ADR-011; frontend-composition.md C02-C04; design-system.md; Billing OpenAPI GET /api/v1/invoices and PARTIALLY_PAID vocabulary.
 
-The composition root selects the existing invoice list at localPath `/`.
-Unknown routes retain a local unavailable/404 frame. The page does not duplicate
-the shell frame or main landmark. Its composed actions emit an invoice ID to the root,
-which requests navigation through context.navigation. Legacy standalone RouterLinks
-remain only in the non-composed branch; no router is provided by the composition adapter.
-
-The synchronous dummy InvoiceListSource returns cloned fictional rows and is directly
-imported as the page's default. Its invoices input permits substituting rows without
-editing page behavior; the source itself is not supplied through an injectable token.
-Numeric COP amounts and fixed summary
-metrics remain demo representations, not API decimal-string payloads or calculated owner totals.
-Search, status filtering and pagination retain their existing local behavior.
-There is no asynchronous read, so domain loading/HTTP failure/forbidden states
-remain for the future owner adapter rather than simulated backend acceptance.
+The root renders the existing invoice list at localPath `/`; unknown routes retain a local 404/unavailable frame. No shell frame, main landmark, HTTP client, session or token management is duplicated.
+The page receives rows through @Input and has an empty default; it imports fixture types only. The composition root chooses the synchronous dummy source and binds cloned rows. The standalone route resolves rows using withComponentInputBinding, configured only in the legacy standalone app; the composition adapter provides no router.
+No DI token is needed in the presentation page to replace its input. The asynchronous owner adapter remains future work; the synchronous fixture interface is not claimed to implement HTTP integration.
+Search, filters and pagination remain local. Numeric COP amounts and fixed summary metrics are demo view representations, not decimal-string API payloads or calculated owner totals.
+Invoice selection uses context.navigation. A repeated pending target is ignored; another target may supersede it, as C02 permits. Only the latest request may update messages or report failures. Cancellation and Angular destruction also discard late work.
 
 | Behavior | RED | GREEN |
 |---|---|---|
-| Root list selection and compositor navigation | `08addd3`: three tests failed for missing selection/output/navigation | `b1f4f8a`: 30 targeted tests passed |
-| Contract partial-payment state | `9e0b4bd`: two tests failed for PARTIAL/unsupported filter | `29c8da7`: 16 list tests passed; fixture isolation is regression evidence |
+| Root list and compositor navigation | `08addd3`: three missing-behavior failures | `b1f4f8a`: 30 targeted tests passed |
+| PARTIALLY_PAID state | `9e0b4bd`: two vocabulary/filter failures | `29c8da7`: 16 list tests passed |
+| Destruction with a live context signal | `d2c98d3`: two late-write failures | `8290ac8`: DestroyRef guards; 20 root tests passed |
+| Source choice at composition boundaries | `adf55aa`: page default, standalone resolver and root rows missing | `4ba3a11`: 44 targeted tests passed |
+| Duplicate/obsolete navigation | `465d065`: duplicate pending target dispatched twice | `b326d32`: 22 root tests passed, including ignored superseded results |
 
-Initial coverage suite: 118 tests passed in 11 files. Lines 93.35%, statements 92.94%,
-branches 91.00%, functions 89.52%; current domain utility coverage remains 100%.
-The suite builds and audits an actual AOT release. The standalone build passed.
-Explicit release build passed for `0.1.0-invoice-list-final-188139d1216446e09a79bedd5d13a6c8`.
-The final suite rebuilt the subsequent fallback-landmark refinement.
+Regression `48b7291` verifies late abort settlement and supplied rows without an artificial RED. Tests use real Angular injection-scope destruction, not a browser disposal assertion. Fixture reads clone rows; tests assign inputs explicitly.
+Final suite: 128 tests passed across 11 files. Source coverage: 93.53% lines, 93.45% statements, 92.79% branches, 89.71% functions; current domain utilities retain 100%.
+Application build passed; the coverage suite also compiles and audits an actual inert AOT release. Coverage rules and exclusions are unchanged. Scripts are outside the source coverage metric.
 
-Browser evidence used a disposable copy of dlc-front dist/fixtures with its actual
-preview proxy/compositor and a QA registry selecting the new release. Verified list
-mount using an existing shell dist snapshot; its build provenance was not revalidated.
-Verified search, partial-payment filter, pagination, empty results, keyboard focus,
-navigation to the pending detail/404, and return through global navigation.
-Checked 1280x800 and 390x844 layouts; the narrow table remains horizontally contained.
-Screenshot: ignored local `.npm-cache/composed-invoice-list-proof.png`.
-This is fixture composition evidence, not deployment or API integration acceptance.
+Original browser evidence used a disposable shell dist/fixtures copy, its actual proxy/compositor and a QA registry selecting the Billing release. Shell build provenance was not revalidated.
+Verified mount, search, partial-payment filter, pagination, empty results, keyboard focus, pending-detail navigation/404 and return via global navigation. Checked 1280x800 and 390x844 layouts with horizontal table containment.
+Screenshot: ignored `.npm-cache/composed-invoice-list-proof.png`. This evidence predates the final source-boundary adjustment and is not deployment or API acceptance.
+Final source-boundary check rebuilt QA release `0.1.0-input-boundary-qa-0e65faa7a4354c2a85a97f27dd734209`, then verified populated rows and search in the same disposable shell. Snapshot: ignored `.npm-cache/invoice-source-boundary-proof.png`. No real shell registry was edited.
 
-Pending: publish/select a new retained release in the real shell registry, compose
-invoice detail/issuance and payments, wire /procedures, owner HTTP states, container/CI
-verification and independent review. Other legacy pages still need status/model alignment.
-No issuance, PDF download or complete HU acceptance is claimed.
-
-## PR #33 review follow-up
-
-Suggested title: `feat(billing): compose invoice list for cut 2 demo`.
-
-| Finding | Decision and evidence |
-|---|---|
-| Late navigation writes | Abort checks already existed: regression `48b7291` proves late cancelled/rejected responses and promise failures cause no writes or reports. A distinct destruction-with-live-signal gap failed two tests in RED `d2c98d3`; GREEN `8290ac8` checks Angular DestroyRef before dispatch and after settlement. Tests use real Angular injection-scope destruction, not a browser disposal assertion. |
-| Source substitution | Regression `48b7291` verifies supplied rows are used instead of default fixtures. This proves input substitution, not DI or a real API adapter. |
-| Numeric money | Tracked owner-adapter debt: move contract types out of the fixture module, retain decimal-string amounts and add decimal-safe display mapping before consuming owner responses. No numeric demo representation may be assumed to satisfy the API contract. |
-| Spanish UI | Retained the existing UI locale. Governance documentation-rules.md prescribes English identifiers/comments/docs and allows localized frontend messages; no new i18n framework is inferred from this review. |
-
-No artificial RED was created for passing regressions. The only new behavior is
-discarding navigation work after Angular destruction, including a still-live AbortSignal.
-Follow-up verification: 124 tests passed across 11 files; source coverage is 93.40%
-lines, 93.31% statements, 92.15% branches and 89.62% functions. Domain utilities
-remain at 100%. Application build and actual AOT release audit passed.
-Current CI, release publication and independent acceptance remain pending.
+Review decisions: source selection now belongs to composition; navigation allows a different target instead of blocking all clicks. English identifiers/comments/docs are retained; existing Spanish UI is localized product copy, not a new i18n framework.
+Money debt remains explicit: move neutral contract types out of the fixture module, retain decimal strings and introduce decimal-safe formatting before owner integration.
+Pending: publish/select a retained release in the real shell, compose detail/issuance/payments and /procedures, align legacy models, implement owner HTTP loading/validation/forbidden/failure states, verify containers/CI and obtain independent acceptance.
+No API response, persistence, authorization, clinical narrative, PDF download or completed HU is claimed.
+Suggested PR title: `feat(billing): compose invoice list for cut 2 demo`.
