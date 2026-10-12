@@ -97,3 +97,19 @@ it('logs a safe asset diagnostic for internal failures without query or disk det
     }, failingRead as typeof readFile);
   } finally { log.mockRestore(); }
 });
+
+it('rejects outside paths before reading or logging an asset', async () => {
+  const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+  const read = vi.fn(async () => { throw new Error('must not read'); });
+  try {
+    await withServer(async origin => {
+      for (const path of ['/portals/clinical/entry.js', '/portals/billing/%2e%2e%2foutside.js']) {
+        const response = await fetch(origin + path);
+        expect(response.status).toBe(404);
+        await response.text();
+      }
+      expect(read).not.toHaveBeenCalled();
+      expect(log).not.toHaveBeenCalled();
+    }, read as typeof readFile);
+  } finally { log.mockRestore(); }
+});
