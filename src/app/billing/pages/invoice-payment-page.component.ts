@@ -14,7 +14,7 @@ import { formatCopMoney } from '../presentation/format-cop-money';
     @if (invoice; as selected) {
       <article><h2>{{ selected.number }} · {{ selected.patientName }}</h2>
         <p>Total: COP {{ format(selected.amount) }} · Pagado: COP {{ format(selected.paidTotal) }}</p>
-        <p><strong>Saldo: COP {{ format(selected.balance) }}</strong> · {{ selected.status }}</p>
+        <p><strong>Saldo: COP {{ format(selected.balance) }}</strong> · {{ statusLabels[selected.status] }}</p>
         @if (!canPay) { <p role="status">Tu sesión no permite registrar pagos en esta demostración.</p> }
         <form (ngSubmit)="submit()">
           <label>Valor del pago (COP)<input name="amount" type="text" inputmode="decimal"
@@ -27,7 +27,7 @@ import { formatCopMoney } from '../presentation/format-cop-money';
         </form>
         <p role="status">{{ feedback }}</p>
         <h2>Pagos registrados en esta sesión</h2>
-        @if (history.length === 0) { <p>Sin pagos nuevos en esta sesión. El pagado inicial pertenece a la fixture.</p> }
+        @if (history.length === 0) { <p>Sin pagos nuevos en esta sesión. El pagado inicial corresponde a los datos ficticios de la demo.</p> }
         <ul>@for (payment of history; track payment.key) {
           <li>COP {{ format(payment.amount) }} · {{ payment.method }}</li>
         }</ul>
@@ -44,6 +44,7 @@ export class InvoicePaymentPageComponent {
   private intent?: { fingerprint: string; key: string };
   amount = ''; method = ''; feedback = '';
   readonly format = formatCopMoney;
+  readonly statusLabels = { DRAFT: 'Borrador', ISSUED: 'Emitida', PARTIALLY_PAID: 'Pago parcial', PAID: 'Pagada', CANCELLED: 'Cancelada' };
   get invoice() { return this.session.detail(this.invoiceId); }
   get history() { return this.session.history(this.invoiceId); }
   get dirty(): boolean { return !!(this.amount || this.method); }
