@@ -34,8 +34,17 @@ describe('BillingListPageComponent', () => {
       number: 'INV-001',
       patientName: 'Paciente de demostración',
       amount: 130000,
-      status: 'PARTIAL',
+      status: 'PARTIALLY_PAID',
     });
+  });
+
+  it('filters the contract partial-payment state and isolates dummy data between instances', () => {
+    const component = new BillingListPageComponent();
+    component.updateSelectedStatus('PARTIALLY_PAID');
+    expect(component.selectedStatus).toBe('PARTIALLY_PAID');
+    expect(component.filteredInvoices.map(i => i.id)).toEqual(['invoice-001']);
+    component.invoices[0].amount = 1;
+    expect(new BillingListPageComponent().invoices[0].amount).toBe(130000);
   });
 
   it('filters invoices by invoice number or patient name', () => {
