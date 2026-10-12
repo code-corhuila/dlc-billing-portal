@@ -16,6 +16,30 @@ it('preserves exact decimal prices and rejects noncanonical or nonpositive demo 
   }
 });
 
+it('does not open or submit a demo price when the composed UI denies management', () => {
+  vi.useFakeTimers();
+  const injector = Injector.create({ providers: [{ provide: PricingCatalogService, useValue: new PricingCatalogService() }] });
+  try {
+    const page = runInInjectionContext(injector, () => new PricingCatalogComponent());
+    page.canManagePrices = false;
+    page.openForm(); page.form = { ...request }; page.submitPrice();
+    expect(page.formVisible()).toBe(false);
+    expect(vi.getTimerCount()).toBe(0);
+  } finally { injector.destroy(); }
+});
+
+it('discards a pending demo submission when management is revoked', () => {
+  vi.useFakeTimers();
+  const injector = Injector.create({ providers: [{ provide: PricingCatalogService, useValue: new PricingCatalogService() }] });
+  try {
+    const page = runInInjectionContext(injector, () => new PricingCatalogComponent());
+    page.form = { ...request }; page.submitPrice(); page.canManagePrices = false;
+    vi.runAllTimers();
+    expect(page.prices()).toHaveLength(3);
+    expect(page.submitting()).toBe(false);
+  } finally { injector.destroy(); }
+});
+
 it('snapshots one submission and retains versions across catalog recreation within a mount', () => {
   vi.useFakeTimers();
   const service = new PricingCatalogService();

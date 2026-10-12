@@ -24,3 +24,26 @@ it('selects only the approved procedures route and guards an open catalog form',
     expect(frame.isProcedures()).toBe(false);
   } finally { injector.destroy(); }
 });
+
+it('uses shared session changes for administrator-only demo editing and cleans the subscription', () => {
+  let notify!: (snapshot: any) => void;
+  const stop = vi.fn();
+  const snapshot = (role: string) => ({ state: 'authenticated', user: { roles: [role] } });
+  const injector = Injector.create({ providers: [provideInvoiceListSource(), {
+    provide: BILLING_CONTEXT, useValue: {
+      route: { localPath: '/procedures' }, signal: new AbortController().signal,
+      session: { getSnapshot: () => snapshot('DENTIST'), subscribe: (listener: typeof notify) => { notify = listener; return stop; } },
+    },
+  }] });
+  const frame = runInInjectionContext(injector, () => new BillingCompositionRoot());
+  expect(frame.canManagePrices()).toBe(false);
+  notify(snapshot('ADMINISTRATOR'));
+  expect(frame.canManagePrices()).toBe(true);
+  notify({ state: 'expired', user: null });
+  expect(frame.canManagePrices()).toBe(false);
+  injector.destroy();
+  const writes = vi.spyOn(frame.session, 'set');
+  notify(snapshot('ADMINISTRATOR'));
+  expect(writes).not.toHaveBeenCalled();
+  expect(stop).toHaveBeenCalledTimes(1);
+});
