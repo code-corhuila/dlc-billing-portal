@@ -1,19 +1,22 @@
-import { Component, DestroyRef, InjectionToken, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, InjectionToken, computed, inject, signal, viewChild } from '@angular/core';
 import { PortalContext } from '../shell-contract';
 import { BillingListPageComponent } from '../billing/pages/billing-list-page.component';
 import { INVOICE_LIST_SOURCE } from '../billing/data/invoice-list-source';
 import { InvoiceDetailPageComponent } from '../billing/pages/invoice-detail-page.component';
+import { PricingCatalogComponent } from '../billing/catalog/pages/pricing-catalog/pricing-catalog.component';
 
 export const BILLING_CONTEXT = new InjectionToken<PortalContext>('billing.context');
 
 @Component({
   selector: 'dlc-billing-root',
   standalone: true,
-  imports: [BillingListPageComponent, InvoiceDetailPageComponent],
+  imports: [BillingListPageComponent, InvoiceDetailPageComponent, PricingCatalogComponent],
   template: `@if (isInvoiceList()) {
     <dlc-billing-list-page [composed]="true" [invoices]="invoices" (openInvoice)="openInvoice($event)" />
   } @else if (isInvoiceDetail()) {
     <dlc-invoice-detail-page [invoice]="selectedInvoice()" (back)="backToList()" />
+  } @else if (isProcedures()) {
+    <dlc-pricing-catalog [composed]="true" />
   } @else {
     <section aria-label="Billing"><h1 tabindex="-1">{{ title() }}</h1>
       <p role="status">{{ message() }}</p></section>
@@ -28,6 +31,12 @@ export class BillingCompositionRoot {
   readonly route = signal(this.context.route);
   readonly invoices = this.source.read();
   readonly isInvoiceList = computed(() => this.route().localPath === '/');
+  readonly isProcedures = computed(() => this.route().localPath === '/procedures');
+  readonly catalog = viewChild(PricingCatalogComponent);
+  canLeave(): boolean {
+    const page = this.catalog();
+    return !page || (!page.formVisible() && !page.submitting());
+  }
   private readonly invoiceId = computed(() => {
     const match = /^\/invoices\/([^/]+)$/.exec(this.route().localPath);
     if (!match) return undefined;

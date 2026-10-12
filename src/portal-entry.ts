@@ -46,7 +46,7 @@ export async function mount(
         if (disposed) throw new Error('CANCELLED');
         root.route.set(route);
       },
-      canLeave: async () => !disposed,
+      canLeave: async () => !disposed && root.canLeave(),
       unmount,
     };
   } catch (error) {

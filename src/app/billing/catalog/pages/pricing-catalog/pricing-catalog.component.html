@@ -1,4 +1,4 @@
-<main class="billing-page">
+<section class="billing-page" aria-label="Catálogo de procedimientos">
 
   <header class="page-header">
 
@@ -7,7 +7,7 @@
         Billing
       </p>
 
-      <h1>
+      <h1 tabindex="-1">
         Precios de procedimientos
       </h1>
 
@@ -20,9 +20,9 @@
 
     <div class="header-actions">
 
-      <a routerLink="/prices/rules" class="secondary-link">
+      @if (!composed) { <a routerLink="/prices/rules" class="secondary-link">
         Reglas adicionales
-      </a>
+      </a> }
 
       <button type="button" class="primary-button" (click)="openForm()">
         + Nuevo precio
@@ -33,7 +33,7 @@
   </header>
 
 
-  <section class="mock-notice">
+  <section class="mock-notice" role="note">
 
     <strong>
       Demostración Cut 2
@@ -79,7 +79,7 @@
 
   @if (errorMessage()) {
 
-  <section class="state-card error-state">
+  <section class="state-card error-state" role="alert">
 
     <h2>
       No fue posible cargar el catálogo
@@ -97,7 +97,7 @@
 
   } @else if (filteredPrices.length === 0) {
 
-  <section class="state-card">
+  <section class="state-card" role="status">
 
     <h2>
       No hay precios para mostrar
@@ -114,7 +114,7 @@
 
   <section class="catalog-card">
 
-    <div class="table-wrapper">
+    <div class="table-wrapper" tabindex="0" role="region" aria-label="Versiones de precios">
 
       <table>
 
@@ -189,7 +189,7 @@
 
   @if (successMessage()) {
 
-  <section class="success-message">
+  <section class="success-message" role="status">
     {{ successMessage() }}
   </section>
 
@@ -200,7 +200,8 @@
 
   <div class="modal-backdrop">
 
-    <section class="modal" role="dialog" aria-modal="true" aria-labelledby="new-price-title">
+    <section class="modal" aria-labelledby="new-price-title">
+      <p role="note">Guarda o cancela el formulario antes de cambiar de sección.</p>
 
       <header class="modal-header">
 
@@ -324,4 +325,4 @@
 
   }
 
-</main>
+</section>

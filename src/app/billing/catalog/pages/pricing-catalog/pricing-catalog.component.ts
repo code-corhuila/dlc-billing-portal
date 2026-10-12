@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, DestroyRef, inject, signal } from '@angular/core';
+import { Component, DestroyRef, Input, inject, signal } from '@angular/core';
 import { copMoney, CopMoney } from '../../../model/cop-money';
 import { formatCopMoney } from '../../../presentation/format-cop-money';
 import { FormsModule } from '@angular/forms';
@@ -23,6 +23,7 @@ import { PricingCatalogService } from '../../services/pricing-catalog.service';
   styleUrl: './pricing-catalog.component.css',
 })
 export class PricingCatalogComponent {
+  @Input() composed = false;
   private readonly pricingCatalogService =
     inject(PricingCatalogService);
 
