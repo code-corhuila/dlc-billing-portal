@@ -1,24 +1,7 @@
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { RouterLink } from '@angular/router';
-
-type BillingInvoiceStatus =
-  | 'DRAFT'
-  | 'ISSUED'
-  | 'PARTIAL'
-  | 'PAID'
-  | 'CANCELLED';
-
-type BillingInvoiceStatusFilter =
-  | 'ALL'
-  | BillingInvoiceStatus;
-
-interface BillingInvoiceListItem {
-  id: string;
-  number: string;
-  patientName: string;
-  amount: number;
-  status: BillingInvoiceStatus;
-}
+import { dummyInvoiceList, InvoiceListItem, InvoiceListStatus } from '../data/invoice-list.dummy';
+type BillingInvoiceStatusFilter = 'ALL' | InvoiceListStatus;
 
 @Component({
   selector: 'dlc-billing-list-page',
@@ -105,7 +88,7 @@ interface BillingInvoiceListItem {
               Emitida
             </option>
 
-            <option value="PARTIAL">
+            <option value="PARTIALLY_PAID">
               Pago parcial
             </option>
 
@@ -212,31 +195,9 @@ export class BillingListPageComponent {
   selectedStatus: BillingInvoiceStatusFilter = 'ALL';
   currentPage = 1;
 
-  readonly invoices: BillingInvoiceListItem[] = [
-    {
-      id: 'invoice-001',
-      number: 'INV-001',
-      patientName: 'Paciente de demostración',
-      amount: 130000,
-      status: 'PARTIAL',
-    },
-    {
-      id: 'invoice-002',
-      number: 'INV-002',
-      patientName: 'Paciente de demostración 2',
-      amount: 120000,
-      status: 'ISSUED',
-    },
-    {
-      id: 'invoice-003',
-      number: 'INV-003',
-      patientName: 'Paciente de demostración 3',
-      amount: 250000,
-      status: 'PAID',
-    },
-  ];
+  @Input() invoices: InvoiceListItem[] = dummyInvoiceList.read();
 
-  get filteredInvoices(): BillingInvoiceListItem[] {
+  get filteredInvoices(): InvoiceListItem[] {
     const normalizedSearchTerm =
       this.searchTerm
         .trim()
@@ -269,7 +230,7 @@ export class BillingListPageComponent {
     );
   }
 
-  get paginatedInvoices(): BillingInvoiceListItem[] {
+  get paginatedInvoices(): InvoiceListItem[] {
     const startIndex =
       (this.currentPage - 1) * this.pageSize;
 
@@ -289,7 +250,7 @@ export class BillingListPageComponent {
       'ALL',
       'DRAFT',
       'ISSUED',
-      'PARTIAL',
+      'PARTIALLY_PAID',
       'PAID',
       'CANCELLED',
     ];
