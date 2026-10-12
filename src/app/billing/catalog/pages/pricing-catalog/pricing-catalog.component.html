@@ -18,7 +18,7 @@
         Reglas adicionales
       </a> }
 
-      <button type="button" class="primary-button" [disabled]="!canManagePrices || submitting()" (click)="openForm()">
+      <button #newPriceButton type="button" class="primary-button" [disabled]="!canManagePrices || submitting()" (click)="openForm()">
         + Nuevo precio
       </button>
 

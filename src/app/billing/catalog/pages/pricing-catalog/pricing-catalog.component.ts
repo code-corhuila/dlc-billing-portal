@@ -24,6 +24,7 @@ import { PricingCatalogService } from '../../services/pricing-catalog.service';
 })
 export class PricingCatalogComponent {
   @ViewChild('priceDialog') priceDialog?: ElementRef<HTMLDialogElement>;
+  @ViewChild('newPriceButton') newPriceButton?: ElementRef<HTMLButtonElement>;
   editing = false;
   @Input() composed = false;
   @Input() canManagePrices = true;
@@ -154,6 +155,9 @@ export class PricingCatalogComponent {
     this.submitting.set(false);
     this.formVisible.set(false);
     this.priceDialog?.nativeElement.close();
+    const button = this.newPriceButton?.nativeElement;
+    // Apply the completed UI state before focusing; Angular renders disabled asynchronously.
+    if (button) { button.disabled = false; button.focus(); }
 
     this.successMessage.set(
       'Nueva versión de precio registrada correctamente en la demostración.',

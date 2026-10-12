@@ -207,6 +207,9 @@ button:disabled {
 }
 
 .modal::backdrop { background: rgba(31, 41, 51, 0.4); }
+.modal h2 { font-size: 18px; }
+.modal label { font-size: 12px; font-weight: 500; }
+.modal input { font-size: 14px; min-height: 40px; }
 
 .modal {
   width: min(480px, calc(100% - 32px));
