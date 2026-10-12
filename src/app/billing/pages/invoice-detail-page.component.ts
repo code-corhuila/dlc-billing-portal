@@ -31,7 +31,10 @@ import { formatCopMoney } from '../presentation/format-cop-money';
             </div>
           }
           <p class="total"><strong>Total de demostración:</strong> COP {{ formatAmount(selected.amount) }}</p>
-          <p>Emisión, pagos y PDF pendientes en esta demostración.</p>
+          <p>Pagado: COP {{ formatAmount(selected.paidTotal) }} · Saldo: COP {{ formatAmount(selected.balance) }}</p>
+          <button type="button" [disabled]="!canPay || !['ISSUED', 'PARTIALLY_PAID'].includes(selected.status)"
+            (click)="pay.emit(selected.id)">Registrar pago</button>
+          <p>Emisión y PDF pendientes en esta demostración.</p>
         </article>
       } @else {
         <p role="status">La factura solicitada no está disponible.</p>
@@ -40,6 +43,8 @@ import { formatCopMoney } from '../presentation/format-cop-money';
 })
 export class InvoiceDetailPageComponent {
   @Input() invoice?: InvoiceDetail;
+  @Input() canPay = false;
+  @Output() readonly pay = new EventEmitter<string>();
   @Output() readonly back = new EventEmitter<void>();
   readonly formatAmount = formatCopMoney;
   readonly statusLabels = {
