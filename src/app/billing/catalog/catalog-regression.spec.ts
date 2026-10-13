@@ -29,14 +29,14 @@ describe('Pricing service regression', () => {
   it('versions a price without mutating existing history or unrelated procedures', () => {
     const prices = service.getFixtures();
     const result = service.createNewVersion(prices, { ...priceRequest, procedureCode: ' PROC-001 ', procedureName: ' Updated price ' });
-    expect(result[0]).toMatchObject({ ...priceRequest, version: 2, active: true, currency: 'COP' });
-    expect(result.find(p => p.id === prices[0].id)?.active).toBe(false);
-    expect(prices[0].active).toBe(true);
+    expect(result[0]).toMatchObject({ procedureCode: 'PROC-001', amount: priceRequest.amount, version: 2, validTo: null, currency: 'COP' });
+    expect(result.find(p => p.id === prices[0].id)?.validTo).toBe('2026-10-10');
+    expect(prices[0].validTo).toBeNull();
     expect(result.find(p => p.id === prices[1].id)).toEqual(prices[1]);
-    const next = service.createNewVersion(result, priceRequest);
+    const next = service.createNewVersion(result, { ...priceRequest, validFrom: '2026-10-12' });
     expect(next[0].version).toBe(3);
-    expect(next.filter(p => p.procedureCode === 'PROC-001' && p.active)).toHaveLength(1);
-    expect(service.createNewVersion([], priceRequest)[0].version).toBe(1);
+    expect(next.filter(p => p.procedureCode === 'PROC-001' && p.validTo === null)).toHaveLength(1);
+    expect(service.createProcedure([], priceRequest)[0].version).toBe(1);
   });
 });
 
@@ -66,7 +66,7 @@ describe('Pricing page regression', () => {
     expect(vi.getTimerCount()).toBe(0);
   });
   it('keeps the form open while pending and completes a simulated version', () => {
-    page.openForm();
+    page.openForPrice(page.prices()[0]);
     page.form = { ...priceRequest };
     page.submitPrice();
     expect(page.submitting()).toBe(true);

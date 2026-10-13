@@ -185,6 +185,11 @@ button:disabled {
   background: #e8f7f5;
 }
 
+.status-badge.scheduled {
+  color: #92400e;
+  background: #fef3c7;
+}
+
 .state-card {
   padding: 40px;
   text-align: center;
