@@ -10,7 +10,7 @@ export const PRICING_CATALOG_FIXTURES: ProcedurePrice[] = [
     currency: 'COP',
     validFrom: '2026-09-01',
     version: 1,
-    active: true,
+    validTo: null,
   },
   {
     id: 'price-002',
@@ -20,7 +20,7 @@ export const PRICING_CATALOG_FIXTURES: ProcedurePrice[] = [
     currency: 'COP',
     validFrom: '2026-09-01',
     version: 1,
-    active: true,
+    validTo: null,
   },
   {
     id: 'price-003',
@@ -30,6 +30,6 @@ export const PRICING_CATALOG_FIXTURES: ProcedurePrice[] = [
     currency: 'COP',
     validFrom: '2026-10-01',
     version: 2,
-    active: true,
+    validTo: null,
   },
 ];

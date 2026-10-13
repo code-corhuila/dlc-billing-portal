@@ -19,7 +19,7 @@
       </a> }
 
       <button #newPriceButton type="button" class="primary-button" [disabled]="!canManagePrices || submitting()" (click)="openForm()">
-        + Nuevo precio
+        + Nuevo procedimiento
       </button>
 
     </div>
@@ -54,7 +54,7 @@
     </label>
 
 
-    <label class="active-filter"><input type="checkbox" [(ngModel)]="onlyActive" /> Solo precios vigentes</label>
+    <label class="active-filter"><input type="checkbox" [(ngModel)]="onlyActive" /> Solo vigentes y programados</label>
   </section>
 
 
@@ -99,16 +99,18 @@
         <article [attr.aria-label]="price.procedureName + ', versión ' + price.version">
           <div class="card-heading">
             <strong class="card-price">{{ formatMoney(price.amount) }}</strong>
-            <span class="status-badge" [class.active]="price.active">
-              {{ price.active ? 'Vigente' : 'Histórico' }}
+            <span class="status-badge" [class.active]="statusOf(price) === 'CURRENT'"
+              [class.scheduled]="statusOf(price) === 'SCHEDULED'">
+              {{ statusLabel(price) }}
             </span>
           </div>
           <h2>{{ price.procedureName }}</h2>
           <p class="procedure-code">{{ price.procedureCode }}</p>
           <footer class="card-footer">
             <span class="version-badge">Versión {{ price.version }}</span>
-            <span>Desde <time>{{ price.validFrom }}</time></span>
-            <button type="button" class="edit-price" [disabled]="!price.active || !canManagePrices || submitting()"
+            <span>Desde <time>{{ price.validFrom }}</time>
+              @if (price.validTo) { · Hasta <time>{{ price.validTo }}</time> }</span>
+            <button type="button" class="edit-price" [disabled]="!canVersion(price) || submitting()"
               [attr.aria-label]="'Nueva versión de ' + price.procedureName" (click)="openForPrice(price)">✎</button>
           </footer>
         </article>
@@ -135,11 +137,11 @@
         <div>
 
           <p class="eyebrow">
-            Nueva versión
+            {{ editing ? 'Nueva versión' : 'Versión 1' }}
           </p>
 
           <h2 id="new-price-title">
-            {{ editing ? 'Nueva versión del precio' : 'Nuevo precio de procedimiento' }}
+            {{ editing ? 'Nueva versión de precio' : 'Nuevo procedimiento' }}
           </h2>
 
         </div>
@@ -166,6 +168,10 @@
             <input type="text" name="procedureCode" [(ngModel)]="form.procedureCode" required
               [readonly]="editing" [disabled]="submitting()" />
 
+            @if (duplicateCode) { <small class="validation-message">
+              Ya existe un procedimiento con este código. Usa el lápiz de su tarjeta para crear una nueva versión.
+              </small> }
+
           </label>
 
 
@@ -176,7 +182,7 @@
             </span>
 
             <input type="text" name="procedureName" [(ngModel)]="form.procedureName" required
-              autofocus [disabled]="submitting()" />
+              autofocus [readonly]="editing" [disabled]="submitting()" />
 
           </label>
 
@@ -188,9 +194,9 @@
             </span>
 
             <input type="text" inputmode="decimal" name="amount" [(ngModel)]="form.amount" required
-              placeholder="80000.00" [disabled]="submitting()" />
+              placeholder="80000.00" [disabled]="submitting()" #amountModel="ngModel" />
 
-            @if (!validAmount) { <small class="validation-message">
+            @if (!validAmount && (amountModel.touched || amountModel.dirty)) { <small class="validation-message">
               Usa un precio positivo con dos decimales y punto, por ejemplo 80000.00.
               </small>
 
@@ -216,7 +222,12 @@
               Vigente desde *
             </span>
 
-            <input type="date" name="validFrom" [(ngModel)]="form.validFrom" required [disabled]="submitting()" />
+            <input type="date" name="validFrom" [(ngModel)]="form.validFrom" required
+              [min]="minValidFrom" [disabled]="submitting()" />
+
+            @if (validFromTooEarly) { <small class="validation-message">
+              Debe ser posterior al inicio de la versión vigente ({{ minValidFrom }} o después).
+              </small> }
 
           </label>
 
@@ -232,13 +243,13 @@
 
           <button type="submit" class="primary-button" [disabled]="
                 !canManagePrices || priceForm.invalid ||
-                !validAmount ||
+                !validAmount || duplicateCode || validFromTooEarly ||
                 submitting()
               ">
             {{
             submitting()
             ? 'Guardando...'
-            : 'Guardar nueva versión'
+            : (editing ? 'Guardar nueva versión' : 'Crear procedimiento')
             }}
           </button>
 
