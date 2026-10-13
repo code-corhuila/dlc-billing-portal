@@ -17,7 +17,7 @@ it('opens the owned dialog for a new price and closes it on cancellation', () =>
   } finally { injector.destroy(); }
 });
 
-it('prefills an active price for a new version, preserves history and closes after saving', () => {
+it('prefills the latest price for a new version, preserves history and closes after saving', () => {
   vi.useFakeTimers();
   const injector = Injector.create({ providers: [{ provide: PricingCatalogService, useValue: new PricingCatalogService() }] });
   try {
@@ -37,7 +37,7 @@ it('prefills an active price for a new version, preserves history and closes aft
     expect(page.prices()[0]).toMatchObject({ amount: '95000.01', version: 2 });
     expect(original.amount).toBe('80000.00');
     page.canManagePrices = false; page.openForPrice(page.prices()[0]);
-    page.canManagePrices = true; page.openForPrice({ ...original, active: false });
+    page.canManagePrices = true; page.openForPrice(original);
     expect(dialog.showModal).toHaveBeenCalledTimes(1);
   } finally { injector.destroy(); }
 });

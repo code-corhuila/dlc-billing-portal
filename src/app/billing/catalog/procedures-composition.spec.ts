@@ -46,7 +46,7 @@ it('snapshots one submission and retains versions across catalog recreation with
   const injector = Injector.create({ providers: [{ provide: PricingCatalogService, useValue: service }] });
   try {
     const page = runInInjectionContext(injector, () => new PricingCatalogComponent());
-    page.openForm(); page.form = { ...request }; page.submitPrice(); page.submitPrice();
+    page.openForPrice(page.prices()[0]); page.form = { ...request }; page.submitPrice(); page.submitPrice();
     page.form.amount = '1.00';
     vi.runAllTimers();
     const next = runInInjectionContext(injector, () => new PricingCatalogComponent());

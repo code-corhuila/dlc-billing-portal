@@ -8,8 +8,9 @@ import { RouterLink } from '@angular/router';
 import {
   CreateProcedurePriceRequest,
   ProcedurePrice,
+  ProcedurePriceStatus,
 } from '../../model/procedure-price.model';
-import { PricingCatalogService } from '../../services/pricing-catalog.service';
+import { PricingCatalogService, localIsoDate } from '../../services/pricing-catalog.service';
 
 @Component({
   selector: 'dlc-pricing-catalog',
@@ -25,7 +26,9 @@ import { PricingCatalogService } from '../../services/pricing-catalog.service';
 export class PricingCatalogComponent {
   @ViewChild('priceDialog') priceDialog?: ElementRef<HTMLDialogElement>;
   @ViewChild('newPriceButton') newPriceButton?: ElementRef<HTMLButtonElement>;
+  // false: new procedure (version 1); true: new price version of an existing procedure.
   editing = false;
+  today = localIsoDate();
   @Input() composed = false;
   @Input() canManagePrices = true;
   private readonly pricingCatalogService =
@@ -55,7 +58,38 @@ export class PricingCatalogComponent {
       this.prices(),
       this.searchTerm,
     );
-    return this.onlyActive ? prices.filter(price => price.active) : prices;
+    return this.onlyActive
+      ? prices.filter(price => this.statusOf(price) !== 'HISTORICAL')
+      : prices;
+  }
+
+  statusOf(price: ProcedurePrice): ProcedurePriceStatus {
+    return this.pricingCatalogService.priceStatus(price, this.today);
+  }
+
+  statusLabel(price: ProcedurePrice): string {
+    return { CURRENT: 'Vigente', SCHEDULED: 'Programado', HISTORICAL: 'Histórico' }[this.statusOf(price)];
+  }
+
+  /** Only the latest version of a procedure can be followed by a new one. */
+  canVersion(price: ProcedurePrice): boolean {
+    return this.canManagePrices &&
+      this.pricingCatalogService.latestVersion(this.prices(), price.procedureCode)?.id === price.id;
+  }
+
+  get duplicateCode(): boolean {
+    return !this.editing && this.form.procedureCode.trim().length > 0 &&
+      this.pricingCatalogService.hasProcedure(this.prices(), this.form.procedureCode);
+  }
+
+  get minValidFrom(): string {
+    return this.editing
+      ? this.pricingCatalogService.minVersionDate(this.prices(), this.form.procedureCode)
+      : '';
+  }
+
+  get validFromTooEarly(): boolean {
+    return this.form.validFrom.length > 0 && this.form.validFrom < this.minValidFrom;
   }
 
   openForm(): void {
@@ -68,7 +102,7 @@ export class PricingCatalogComponent {
   }
 
   openForPrice(price: ProcedurePrice): void {
-    if (!price.active || !this.canManagePrices || this.submitting() || this.destroyRef.destroyed) return;
+    if (!this.canVersion(price) || this.submitting() || this.destroyRef.destroyed) return;
     this.openForm();
     this.editing = true;
     this.form = { procedureCode: price.procedureCode, procedureName: price.procedureName, amount: price.amount, validFrom: '' };
@@ -94,15 +128,14 @@ export class PricingCatalogComponent {
     this.pendingTimer = setTimeout(() => {
       if (this.destroyRef.destroyed) return;
       if (!this.canManagePrices) { this.submitting.set(false); return; }
-      const updatedPrices =
-        this.pricingCatalogService.createNewVersion(
-          this.prices(),
-          request,
-        );
+      const editing = this.editing;
+      const updatedPrices = editing
+        ? this.pricingCatalogService.createNewVersion(this.prices(), request)
+        : this.pricingCatalogService.createProcedure(this.prices(), request);
 
       this.prices.set(updatedPrices);
 
-      this.finishSubmitting();
+      this.finishSubmitting(editing);
     }, 900);
   }
 
@@ -142,7 +175,9 @@ export class PricingCatalogComponent {
       this.form.procedureCode.trim().length > 0 &&
       this.form.procedureName.trim().length > 0 &&
       this.validAmount &&
-      this.form.validFrom.length > 0
+      this.form.validFrom.length > 0 &&
+      !this.duplicateCode &&
+      !this.validFromTooEarly
     );
   }
 
@@ -151,7 +186,7 @@ export class PricingCatalogComponent {
     this.clearMessages();
   }
 
-  private finishSubmitting(): void {
+  private finishSubmitting(editing: boolean): void {
     this.submitting.set(false);
     this.formVisible.set(false);
     this.priceDialog?.nativeElement.close();
@@ -159,9 +194,9 @@ export class PricingCatalogComponent {
     // Apply the completed UI state before focusing; Angular renders disabled asynchronously.
     if (button) { button.disabled = false; button.focus(); }
 
-    this.successMessage.set(
-      'Nueva versión de precio registrada correctamente en la demostración.',
-    );
+    this.successMessage.set(editing
+      ? 'Nueva versión de precio registrada correctamente en la demostración.'
+      : 'Procedimiento registrado correctamente en la demostración.');
 
     this.resetForm();
   }
