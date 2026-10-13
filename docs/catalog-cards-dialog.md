@@ -40,3 +40,30 @@ are unchanged. QA release paths are temporary; delivery retains
 `billing-portal-demo`, `dlc-billing-portal_default`, `/portals/billing/0.1.0-demo/entry.js`.
 Additional-rule composition, real deployment verification and independent acceptance
 remain pending. No duration, clinical-description or deletion behavior is credited.
+
+## Procedure creation vs. price versions
+
+Owner review found that "+ Nuevo precio" with a free code silently superseded an
+existing procedure and that a future-dated version became current immediately.
+Billing OpenAPI `POST /procedure-prices` is one "Create price version" operation whose
+validity cannot overlap per procedure and closes the previous validity; the demo now
+mirrors that in two explicit entry points:
+
+- **+ Nuevo procedimiento** creates version 1. Codes are trimmed and upper-cased; an
+  existing code is rejected with guidance to version it from its card.
+- **Card action (✎)** is enabled only on the latest version. Code and name are read-only;
+  "Vigente desde" must be after the latest version's start. The previous version gets
+  `validTo` = new start minus one day.
+- Status is derived from dates against today: Vigente, Programado (future) or Histórico.
+  The filter "Solo vigentes y programados" hides only historical versions.
+- The amount error appears only after the field is touched.
+
+The stored `active` flag was replaced by `validTo`. Date-only validity remains a display
+simplification of the owner Timestamp; overlap and concurrency authority stay in Billing.
+
+| Behavior | RED | GREEN | Result |
+|---|---|---|---|
+| Distinct creation, duplicate rejection, non-overlapping dated versions, derived status | e4f19d3: 6 expected failures | 185 tests passed in 24 files | Passed |
+
+Coverage: lines 94.71%, statements 93.94%, branches 93.75%, functions 93.02%.
+Normal Angular build and portal release build passed. Browser QA not yet performed.
