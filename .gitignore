@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.angular/
+.env
+*.pem
+*.tsbuildinfo
+.npm-cache/
+coverage/

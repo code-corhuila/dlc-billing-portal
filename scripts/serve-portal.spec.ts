@@ -1,0 +1,115 @@
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
+import type { AddressInfo } from 'node:net';
+import { expect, it, vi } from 'vitest';
+import { readFile } from 'node:fs/promises';
+
+async function withServer(check: (origin: string) => Promise<void>, readAsset = readFile) {
+  const { createPortalServer } = await import('./serve-portal.mjs');
+  const parent = resolve(tmpdir());
+  const root = mkdtempSync(join(parent, 'billing-static-'));
+  mkdirSync(join(root, '0.1.0-demo'));
+  writeFileSync(join(root, '0.1.0-demo/entry.js'), 'export const portalId = "billing";');
+  writeFileSync(join(root, '0.1.0-demo/entry.css'), '.bil-frame { color: teal; }');
+  const server = createPortalServer(root, readAsset);
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const port = (server.address() as AddressInfo).port;
+  try { await check(`http://127.0.0.1:${port}`); } finally {
+    await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+    expect(dirname(root)).toBe(parent);
+    rmSync(root, { recursive: true });
+  }
+}
+
+it('serves the entry and sibling assets with their content types and no-store', async () => {
+  await withServer(async (origin) => {
+    const entry = await fetch(`${origin}/portals/billing/0.1.0-demo/entry.js`);
+    expect(entry.status).toBe(200);
+    expect(entry.headers.get('content-type')).toContain('javascript');
+    expect(entry.headers.get('cache-control')).toBe('no-store');
+    expect(await entry.text()).toContain('export const portalId');
+    const css = await fetch(`${origin}/portals/billing/0.1.0-demo/entry.css`);
+    expect(css.headers.get('content-type')).toContain('text/css');
+    await css.text();
+  });
+});
+
+it('answers HEAD probes without returning a response body', async () => {
+  await withServer(async (origin) => {
+    const response = await fetch(`${origin}/portals/billing/0.1.0-demo/entry.js`, { method: 'HEAD' });
+    expect(response.status).toBe(200);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(await response.text()).toBe('');
+  });
+});
+
+it('returns real 404 responses for missing assets and paths outside Billing', async () => {
+  await withServer(async (origin) => {
+    for (const path of ['/portals/billing/0.1.0-demo/missing.js', '/app/billing',
+      '/portals/clinical/entry.js', '/portals/billing/%2e%2e%2fpackage.json']) {
+      const response = await fetch(origin + path);
+      expect(response.status).toBe(404);
+      expect(await response.text()).not.toContain('<html');
+    }
+  });
+});
+
+it('rejects writes to the static service', async () => {
+  await withServer(async (origin) => {
+    const response = await fetch(`${origin}/portals/billing/0.1.0-demo/entry.js`, { method: 'POST' });
+    expect(response.status).toBe(405);
+    expect(response.headers.get('allow')).toBe('GET, HEAD');
+    await response.text();
+  });
+});
+
+it.each(['EACCES', 'EIO'])('reports %s as a server failure without exposing details', async (code) => {
+  const failingRead = async () => { throw Object.assign(new Error('private disk details'), { code }); };
+  await withServer(async (origin) => {
+    const response = await fetch(`${origin}/portals/billing/0.1.0-demo/entry.js`);
+    expect(response.status).toBe(500);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(await response.text()).not.toContain('private disk details');
+  }, failingRead as typeof readFile);
+});
+
+it('rejects malformed URL encoding as a bad request', async () => {
+  await withServer(async (origin) => {
+    const response = await fetch(`${origin}/portals/billing/%ZZ`);
+    expect(response.status).toBe(400);
+    await response.text();
+  });
+});
+
+it('logs a safe asset diagnostic for internal failures without query or disk details', async () => {
+  const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+  const failingRead = async () => { throw Object.assign(new Error('private disk details'), { code: 'EIO' }); };
+  try {
+    await withServer(async (origin) => {
+      const response = await fetch(`${origin}/portals/billing/0.1.0-demo/entry.js?secret=hidden`);
+      expect(response.status).toBe(500);
+      await response.text();
+      expect(log).toHaveBeenCalledWith(JSON.stringify({
+        event: 'BILLING_PREVIEW_READ_FAILED', code: 'EIO', asset: '0.1.0-demo/entry.js',
+      }));
+      expect(JSON.stringify(log.mock.calls)).not.toMatch(/private disk|secret|hidden/);
+    }, failingRead as typeof readFile);
+  } finally { log.mockRestore(); }
+});
+
+it('rejects outside paths before reading or logging an asset', async () => {
+  const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+  const read = vi.fn(async () => { throw new Error('must not read'); });
+  try {
+    await withServer(async origin => {
+      for (const path of ['/portals/clinical/entry.js', '/portals/billing/%2e%2e%2foutside.js']) {
+        const response = await fetch(origin + path);
+        expect(response.status).toBe(404);
+        await response.text();
+      }
+      expect(read).not.toHaveBeenCalled();
+      expect(log).not.toHaveBeenCalled();
+    }, read as typeof readFile);
+  } finally { log.mockRestore(); }
+});

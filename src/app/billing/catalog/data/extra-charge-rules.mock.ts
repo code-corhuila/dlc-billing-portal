@@ -1,0 +1,40 @@
+import { ExtraChargeRule } from '../model/extra-charge-rule.model';
+
+export const EXTRA_CHARGE_RULE_FIXTURES: ExtraChargeRule[] = [
+  {
+    id: 'rule-001',
+    code: 'EXTRA-MATERIAL-001',
+    name: 'Material odontológico adicional',
+    description: 'Cargo ficticio por material adicional utilizado.',
+    type: 'MATERIAL',
+    amount: 20000,
+    currency: 'COP',
+    validFrom: '2026-09-01',
+    version: 1,
+    active: true,
+  },
+  {
+    id: 'rule-002',
+    code: 'EXTRA-COMPLEXITY-001',
+    name: 'Complejidad adicional',
+    description: 'Cargo ficticio asociado a una mayor complejidad.',
+    type: 'COMPLEXITY',
+    amount: 35000,
+    currency: 'COP',
+    validFrom: '2026-09-01',
+    version: 1,
+    active: true,
+  },
+  {
+    id: 'rule-003',
+    code: 'EXTRA-PROC-001',
+    name: 'Procedimiento adicional',
+    description: 'Cargo ficticio por procedimiento adicional.',
+    type: 'ADDITIONAL_PROCEDURE',
+    amount: 50000,
+    currency: 'COP',
+    validFrom: '2026-10-01',
+    version: 1,
+    active: true,
+  },
+];

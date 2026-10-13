@@ -1,0 +1,30 @@
+:host { display: block; color: #1f2933; font: 14px/1.5 Inter, system-ui, sans-serif; }
+.billing-page { padding: 24px; background: #f7f9fa; }
+h1 { font-size: 24px; line-height: 1.25; margin: 8px 0; }
+h2 { font-size: 18px; margin-top: 0; }
+header { margin-bottom: 24px; }
+header > p { margin: 4px 0; }
+header > p:first-child { color: #0f766e; font-weight: 600; }
+[role="note"] { color: #66737a; }
+.summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-bottom: 24px; }
+.summary article, .invoice-panel { background: white; border: 1px solid #d6dee2; border-radius: 12px; padding: 16px; }
+.summary p { margin: 0 0 8px; }
+.summary strong { font-size: 24px; font-variant-numeric: tabular-nums; }
+.filters { display: grid; grid-template-columns: auto minmax(0, 1fr) auto minmax(140px, 1fr); align-items: center; gap: 12px; margin-bottom: 16px; }
+input, select, button { font: inherit; border: 1px solid #d6dee2; border-radius: 8px; padding: 8px 12px; }
+input, select { min-width: 0; background: white; color: #1f2933; }
+button { background: #0f766e; color: white; cursor: pointer; }
+button:disabled { background: #eef2f4; color: #66737a; cursor: default; }
+a { color: #0f766e; }
+:is(input, select, button, a, .table-scroll):focus-visible { outline: 3px solid #1554a3; outline-offset: 3px; }
+.table-scroll { overflow-x: auto; }
+table { width: 100%; min-width: 650px; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+th { background: #eef2f4; text-align: left; }
+th, td { padding: 12px; border-bottom: 1px solid #d6dee2; }
+nav { display: flex; align-items: center; justify-content: flex-end; gap: 12px; margin-top: 16px; }
+@media (max-width: 720px) {
+  .billing-page { padding: 16px; }
+  .summary { grid-template-columns: 1fr; }
+  .filters { grid-template-columns: 1fr; gap: 8px; }
+  nav { justify-content: space-between; flex-wrap: wrap; }
+}
