@@ -1,4 +1,5 @@
 
+
 export type EncounterAccountStatus =
   | 'OPEN'
   | 'DECLARED'
@@ -61,15 +62,7 @@ export function canAcceptChargeSource(
   sourceType: EncounterChargeSourceType,
   sourceId: string,
 ): boolean {
-  if (account.status !== 'DECLARED') {
-    return false;
-  }
-
-  if (sourceType === 'procedure') {
-    return account.declaredProcedureIds.includes(sourceId);
-  }
-
-  return account.declaredManualChargeIds.includes(sourceId);
+  return account.status === 'OPEN';
 }
 
 export function registerEncounterChargeSource(
@@ -172,4 +165,3 @@ export function completeEncounterCharges(
     status: 'CHARGES_COMPLETED',
   };
 }
-
