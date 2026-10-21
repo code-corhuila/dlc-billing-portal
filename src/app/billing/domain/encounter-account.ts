@@ -1,3 +1,4 @@
+
 export type EncounterAccountStatus =
   | 'OPEN'
   | 'DECLARED'
@@ -7,12 +8,39 @@ export type EncounterChargeSourceType =
   | 'procedure'
   | 'manual';
 
+export interface EncounterAccountIdentity {
+  clinicalRecordId: string;
+  consultationId: string;
+  appointmentId: string;
+  patientId: string;
+}
+
 export interface EncounterAccount {
+  clinicalRecordId?: string;
+  consultationId?: string;
+  appointmentId?: string;
+  patientId?: string;
   status: EncounterAccountStatus;
   declaredProcedureIds: string[];
   declaredManualChargeIds: string[];
   chargedProcedureIds: string[];
   chargedManualChargeIds: string[];
+}
+
+export function createEncounterAccount(
+  identity: EncounterAccountIdentity,
+): EncounterAccount {
+  return {
+    clinicalRecordId: identity.clinicalRecordId,
+    consultationId: identity.consultationId,
+    appointmentId: identity.appointmentId,
+    patientId: identity.patientId,
+    status: 'OPEN',
+    declaredProcedureIds: [],
+    declaredManualChargeIds: [],
+    chargedProcedureIds: [],
+    chargedManualChargeIds: [],
+  };
 }
 
 export function declareEncounterSources(
@@ -144,3 +172,4 @@ export function completeEncounterCharges(
     status: 'CHARGES_COMPLETED',
   };
 }
+
