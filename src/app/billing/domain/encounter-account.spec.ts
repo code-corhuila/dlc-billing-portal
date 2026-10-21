@@ -1,3 +1,4 @@
+
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -5,6 +6,7 @@ import {
   EncounterAccountStatus,
   canAcceptChargeSource,
   completeEncounterCharges,
+  createEncounterAccount,
   declareEncounterSources,
   isEncounterChargesComplete,
   registerEncounterChargeSource,
@@ -17,6 +19,43 @@ describe('encounter account rules', () => {
     declaredManualChargeIds: [],
     chargedProcedureIds: [],
     chargedManualChargeIds: [],
+  });
+
+  it('creates an encounter account with its encounter identity and references', () => {
+    const account = createEncounterAccount({
+      clinicalRecordId: 'clinical-record-001',
+      consultationId: 'consultation-001',
+      appointmentId: 'appointment-001',
+      patientId: 'patient-001',
+    });
+
+    expect(account).toEqual({
+      clinicalRecordId: 'clinical-record-001',
+      consultationId: 'consultation-001',
+      appointmentId: 'appointment-001',
+      patientId: 'patient-001',
+      status: 'OPEN',
+      declaredProcedureIds: [],
+      declaredManualChargeIds: [],
+      chargedProcedureIds: [],
+      chargedManualChargeIds: [],
+    });
+  });
+
+  it('keeps clinical record and consultation as the encounter identity', () => {
+    const account = createEncounterAccount({
+      clinicalRecordId: 'clinical-record-101',
+      consultationId: 'consultation-202',
+      appointmentId: 'appointment-303',
+      patientId: 'patient-404',
+    });
+
+    expect(account.clinicalRecordId).toBe(
+      'clinical-record-101',
+    );
+    expect(account.consultationId).toBe(
+      'consultation-202',
+    );
   });
 
   it('declares the fixed procedure and manual charge source lists', () => {
