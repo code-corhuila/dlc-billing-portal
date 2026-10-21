@@ -1,5 +1,4 @@
 
-
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -76,6 +75,69 @@ describe('encounter account rules', () => {
     expect(declared.declaredManualChargeIds).toEqual([
       'manual-charge-1',
     ]);
+  });
+
+  it('keeps the same account when a declaration is repeated', () => {
+    const account = declareEncounterSources(
+      createOpenAccount(),
+      ['procedure-1'],
+      ['manual-charge-1'],
+    );
+
+    const repeated = declareEncounterSources(
+      account,
+      ['procedure-1'],
+      ['manual-charge-1'],
+    );
+
+    expect(repeated).toBe(account);
+  });
+
+  it('preserves declared sources when a conflicting declaration arrives', () => {
+    const account = declareEncounterSources(
+      createOpenAccount(),
+      ['procedure-1'],
+      ['manual-charge-1'],
+    );
+
+    const conflicting = declareEncounterSources(
+      account,
+      ['procedure-2'],
+      ['manual-charge-2'],
+    );
+
+    expect(conflicting).toBe(account);
+    expect(conflicting.declaredProcedureIds).toEqual([
+      'procedure-1',
+    ]);
+    expect(conflicting.declaredManualChargeIds).toEqual([
+      'manual-charge-1',
+    ]);
+  });
+
+  it('does not redeclare a completed encounter account', () => {
+    const declared = declareEncounterSources(
+      createOpenAccount(),
+      ['procedure-1'],
+      [],
+    );
+
+    const charged = {
+      ...declared,
+      chargedProcedureIds: ['procedure-1'],
+    };
+
+    const completed = completeEncounterCharges(charged);
+
+    expect(completed.status).toBe('CHARGES_COMPLETED');
+
+    const repeated = declareEncounterSources(
+      completed,
+      ['procedure-2'],
+      ['manual-charge-2'],
+    );
+
+    expect(repeated).toBe(completed);
   });
 
   it('accepts charge sources while the encounter is open', () => {

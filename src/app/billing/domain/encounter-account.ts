@@ -49,6 +49,10 @@ export function declareEncounterSources(
   procedureIds: string[],
   manualChargeIds: string[],
 ): EncounterAccount {
+  if (account.status !== 'OPEN') {
+    return account;
+  }
+
   return {
     ...account,
     status: 'DECLARED',
