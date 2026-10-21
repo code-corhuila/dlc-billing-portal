@@ -7,6 +7,7 @@ import {
   completeEncounterCharges,
   declareEncounterSources,
   isEncounterChargesComplete,
+  registerEncounterChargeSource,
 } from './encounter-account';
 
 describe('encounter account rules', () => {
@@ -75,6 +76,133 @@ describe('encounter account rules', () => {
         'manual-charge-2',
       ),
     ).toBe(false);
+  });
+
+  it('registers a declared procedure charge', () => {
+    const account = declareEncounterSources(
+      createOpenAccount(),
+      ['procedure-1'],
+      [],
+    );
+
+    const updated = registerEncounterChargeSource(
+      account,
+      'procedure',
+      'procedure-1',
+    );
+
+    expect(updated.chargedProcedureIds).toEqual([
+      'procedure-1',
+    ]);
+  });
+
+  it('registers a declared manual charge', () => {
+    const account = declareEncounterSources(
+      createOpenAccount(),
+      [],
+      ['manual-charge-1'],
+    );
+
+    const updated = registerEncounterChargeSource(
+      account,
+      'manual',
+      'manual-charge-1',
+    );
+
+    expect(updated.chargedManualChargeIds).toEqual([
+      'manual-charge-1',
+    ]);
+  });
+
+  it('ignores a charge source that was not declared', () => {
+    const account = declareEncounterSources(
+      createOpenAccount(),
+      ['procedure-1'],
+      [],
+    );
+
+    const updated = registerEncounterChargeSource(
+      account,
+      'procedure',
+      'procedure-2',
+    );
+
+    expect(updated).toEqual(account);
+  });
+
+  it('does not register the same procedure charge twice', () => {
+    const account: EncounterAccount = {
+      status: 'DECLARED',
+      declaredProcedureIds: ['procedure-1'],
+      declaredManualChargeIds: [],
+      chargedProcedureIds: ['procedure-1'],
+      chargedManualChargeIds: [],
+    };
+
+    const updated = registerEncounterChargeSource(
+      account,
+      'procedure',
+      'procedure-1',
+    );
+
+    expect(updated.chargedProcedureIds).toEqual([
+      'procedure-1',
+    ]);
+  });
+
+  it('does not register the same manual charge twice', () => {
+    const account: EncounterAccount = {
+      status: 'DECLARED',
+      declaredProcedureIds: [],
+      declaredManualChargeIds: ['manual-charge-1'],
+      chargedProcedureIds: [],
+      chargedManualChargeIds: ['manual-charge-1'],
+    };
+
+    const updated = registerEncounterChargeSource(
+      account,
+      'manual',
+      'manual-charge-1',
+    );
+
+    expect(updated.chargedManualChargeIds).toEqual([
+      'manual-charge-1',
+    ]);
+  });
+
+  it('supports declared charges arriving in any order', () => {
+    let account = declareEncounterSources(
+      createOpenAccount(),
+      ['procedure-1', 'procedure-2'],
+      ['manual-charge-1'],
+    );
+
+    account = registerEncounterChargeSource(
+      account,
+      'procedure',
+      'procedure-2',
+    );
+
+    account = registerEncounterChargeSource(
+      account,
+      'manual',
+      'manual-charge-1',
+    );
+
+    account = registerEncounterChargeSource(
+      account,
+      'procedure',
+      'procedure-1',
+    );
+
+    expect(account.chargedProcedureIds).toEqual([
+      'procedure-2',
+      'procedure-1',
+    ]);
+    expect(account.chargedManualChargeIds).toEqual([
+      'manual-charge-1',
+    ]);
+    expect(isEncounterChargesComplete(account)).toBe(true);
   });
 
   it('does not complete while declared sources are still missing charges', () => {
@@ -170,6 +298,28 @@ describe('encounter account rules', () => {
         'procedure-1',
       ),
     ).toBe(false);
+  });
+
+  it('does not register charges after charges are completed', () => {
+    const account: EncounterAccount = {
+      status: 'CHARGES_COMPLETED',
+      declaredProcedureIds: [
+        'procedure-1',
+      ],
+      declaredManualChargeIds: [],
+      chargedProcedureIds: [
+        'procedure-1',
+      ],
+      chargedManualChargeIds: [],
+    };
+
+    const updated = registerEncounterChargeSource(
+      account,
+      'procedure',
+      'procedure-1',
+    );
+
+    expect(updated).toEqual(account);
   });
 
   it('defines only the encounter account lifecycle states', () => {
