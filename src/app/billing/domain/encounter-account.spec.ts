@@ -1,4 +1,5 @@
 
+
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -77,12 +78,8 @@ describe('encounter account rules', () => {
     ]);
   });
 
-  it('accepts only declared sources after the encounter is declared', () => {
-    const account = declareEncounterSources(
-      createOpenAccount(),
-      ['procedure-1'],
-      ['manual-charge-1'],
-    );
+  it('accepts charge sources while the encounter is open', () => {
+    const account = createOpenAccount();
 
     expect(
       canAcceptChargeSource(
@@ -99,12 +96,20 @@ describe('encounter account rules', () => {
         'manual-charge-1',
       ),
     ).toBe(true);
+  });
+
+  it('rejects new charge sources after declaration', () => {
+    const account = declareEncounterSources(
+      createOpenAccount(),
+      ['procedure-1'],
+      ['manual-charge-1'],
+    );
 
     expect(
       canAcceptChargeSource(
         account,
         'procedure',
-        'procedure-2',
+        'procedure-1',
       ),
     ).toBe(false);
 
@@ -112,20 +117,14 @@ describe('encounter account rules', () => {
       canAcceptChargeSource(
         account,
         'manual',
-        'manual-charge-2',
+        'manual-charge-1',
       ),
     ).toBe(false);
   });
 
-  it('registers a declared procedure charge', () => {
-    const account = declareEncounterSources(
-      createOpenAccount(),
-      ['procedure-1'],
-      [],
-    );
-
+  it('registers a procedure charge while open', () => {
     const updated = registerEncounterChargeSource(
-      account,
+      createOpenAccount(),
       'procedure',
       'procedure-1',
     );
@@ -135,15 +134,9 @@ describe('encounter account rules', () => {
     ]);
   });
 
-  it('registers a declared manual charge', () => {
-    const account = declareEncounterSources(
-      createOpenAccount(),
-      [],
-      ['manual-charge-1'],
-    );
-
+  it('registers a manual charge while open', () => {
     const updated = registerEncounterChargeSource(
-      account,
+      createOpenAccount(),
       'manual',
       'manual-charge-1',
     );
@@ -153,29 +146,33 @@ describe('encounter account rules', () => {
     ]);
   });
 
-  it('ignores a charge source that was not declared', () => {
+  it('rejects charge registration after declaration', () => {
     const account = declareEncounterSources(
       createOpenAccount(),
       ['procedure-1'],
-      [],
+      ['manual-charge-1'],
     );
 
-    const updated = registerEncounterChargeSource(
+    const procedureResult = registerEncounterChargeSource(
       account,
       'procedure',
-      'procedure-2',
+      'procedure-1',
     );
 
-    expect(updated).toEqual(account);
+    const manualResult = registerEncounterChargeSource(
+      account,
+      'manual',
+      'manual-charge-1',
+    );
+
+    expect(procedureResult).toBe(account);
+    expect(manualResult).toBe(account);
   });
 
   it('does not register the same procedure charge twice', () => {
     const account: EncounterAccount = {
-      status: 'DECLARED',
-      declaredProcedureIds: ['procedure-1'],
-      declaredManualChargeIds: [],
+      ...createOpenAccount(),
       chargedProcedureIds: ['procedure-1'],
-      chargedManualChargeIds: [],
     };
 
     const updated = registerEncounterChargeSource(
@@ -191,10 +188,7 @@ describe('encounter account rules', () => {
 
   it('does not register the same manual charge twice', () => {
     const account: EncounterAccount = {
-      status: 'DECLARED',
-      declaredProcedureIds: [],
-      declaredManualChargeIds: ['manual-charge-1'],
-      chargedProcedureIds: [],
+      ...createOpenAccount(),
       chargedManualChargeIds: ['manual-charge-1'],
     };
 
@@ -209,12 +203,8 @@ describe('encounter account rules', () => {
     ]);
   });
 
-  it('supports declared charges arriving in any order', () => {
-    let account = declareEncounterSources(
-      createOpenAccount(),
-      ['procedure-1', 'procedure-2'],
-      ['manual-charge-1'],
-    );
+  it('supports charges arriving in any order before declaration', () => {
+    let account = createOpenAccount();
 
     account = registerEncounterChargeSource(
       account,
@@ -232,6 +222,12 @@ describe('encounter account rules', () => {
       account,
       'procedure',
       'procedure-1',
+    );
+
+    account = declareEncounterSources(
+      account,
+      ['procedure-1', 'procedure-2'],
+      ['manual-charge-1'],
     );
 
     expect(account.chargedProcedureIds).toEqual([
