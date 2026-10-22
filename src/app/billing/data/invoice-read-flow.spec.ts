@@ -3,7 +3,10 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type { PortalContext } from '../../shell-contract';
 import { loadInvoiceReadState } from './invoice-read-flow';
-import { createInvoiceReadState } from './invoice-read-state';
+import {
+  createInvoiceReadState,
+  type InvoiceReadState,
+} from './invoice-read-state';
 
 type ReadContext = Pick<PortalContext, 'http' | 'signal'>;
 
@@ -175,5 +178,100 @@ describe('invoice read flow', () => {
       status: 'error',
       invoices: [],
     });
+  });
+
+  it('publishes loading before a pending request finishes', async () => {
+    let resolveRequest!: (value: unknown) => void;
+    const pending = new Promise<unknown>((resolve) => {
+      resolveRequest = resolve;
+    });
+    const request = vi.fn().mockReturnValue(pending);
+    const states: InvoiceReadState[] = [];
+
+    const result = loadInvoiceReadState(
+      createContext(request),
+      createInvoiceReadState(),
+      (state) => states.push(state),
+    );
+
+    expect(states).toEqual([
+      { status: 'loading', invoices: [] },
+    ]);
+
+    resolveRequest({ ok: true, data: invoicePage });
+    await result;
+
+    expect(states.map((state) => state.status)).toEqual([
+      'loading',
+      'success',
+    ]);
+  });
+
+  it('publishes an empty loading state instead of previous invoices', async () => {
+    const request = vi.fn().mockResolvedValue({
+      ok: true,
+      data: { data: [], meta: {} },
+    });
+    const states: InvoiceReadState[] = [];
+
+    await loadInvoiceReadState(
+      createContext(request),
+      {
+        status: 'success',
+        invoices: [
+          {
+            id: 'old-invoice',
+            number: 'OLD-001',
+            patientName: 'Demo Patient',
+            amount: '100.00',
+            status: 'ISSUED',
+          },
+        ],
+      },
+      (state) => states.push(state),
+    );
+
+    expect(states).toEqual([
+      { status: 'loading', invoices: [] },
+      { status: 'success', invoices: [] },
+    ]);
+  });
+
+  it('publishes loading followed by error on HTTP failure', async () => {
+    const request = vi.fn().mockResolvedValue({ ok: false });
+    const states: InvoiceReadState[] = [];
+
+    await loadInvoiceReadState(
+      createContext(request),
+      createInvoiceReadState(),
+      (state) => states.push(state),
+    );
+
+    expect(states).toEqual([
+      { status: 'loading', invoices: [] },
+      { status: 'error', invoices: [] },
+    ]);
+  });
+
+  it('does not publish loading for an already cancelled request', async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const request = vi.fn();
+    const states: InvoiceReadState[] = [];
+
+    const result = await loadInvoiceReadState(
+      createContext(request, controller.signal),
+      createInvoiceReadState(),
+      (state) => states.push(state),
+    );
+
+    expect(result).toEqual({
+      status: 'cancelled',
+      invoices: [],
+    });
+    expect(states).toEqual([
+      { status: 'cancelled', invoices: [] },
+    ]);
+    expect(request).not.toHaveBeenCalled();
   });
 });
