@@ -1,7 +1,9 @@
+
 import { Component, DestroyRef, InjectionToken, computed, inject, signal, viewChild } from '@angular/core';
 import { PortalContext } from '../shell-contract';
 import { BillingListPageComponent } from '../billing/pages/billing-list-page.component';
 import { INVOICE_LIST_SOURCE } from '../billing/data/invoice-list-source';
+import { createInvoiceReadState } from '../billing/data/invoice-read-state';
 import { InvoiceDetailPageComponent } from '../billing/pages/invoice-detail-page.component';
 import { PricingCatalogComponent } from '../billing/catalog/pages/pricing-catalog/pricing-catalog.component';
 import { DemoInvoicePayments } from '../billing/data/demo-invoice-payments';
@@ -35,6 +37,7 @@ export class BillingCompositionRoot {
   private pendingInvoice?: string;
   private readonly source = inject(INVOICE_LIST_SOURCE);
   readonly session = signal(this.context.session.getSnapshot());
+  readonly invoiceReadState = signal(createInvoiceReadState());
   readonly canManagePrices = computed(() => this.session()?.state === 'authenticated'
     && this.session()?.user?.roles.includes('ADMINISTRATOR') === true);
   constructor() {
