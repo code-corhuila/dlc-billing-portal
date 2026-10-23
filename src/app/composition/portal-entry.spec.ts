@@ -431,3 +431,54 @@ it.each(['cancelled', 'failure'])('deduplicates pending targets and ignores supe
     expect(capabilities.reportFailure).not.toHaveBeenCalled();
   } finally { injector.destroy(); }
 });
+it('selects HTTP invoice rows and status only when explicitly enabled', async () => {
+  const { BILLING_CONTEXT, BillingCompositionRoot } =
+    await import('./billing-root.component');
+
+  const capabilities = context();
+  const injector = Injector.create({
+    providers: [
+      provideInvoiceListSource(),
+      { provide: BILLING_CONTEXT, useValue: capabilities },
+    ],
+  });
+
+  try {
+    const frame = runInInjectionContext(
+      injector,
+      () => new BillingCompositionRoot(),
+    );
+
+    frame.invoiceReadState.set({
+      status: 'success',
+      invoices: [{
+        id: 'real-invoice-001',
+        number: 'INV-REAL-001',
+        patientName: 'patient-001',
+        amount: '150000.00',
+        status: 'ISSUED',
+      }],
+    });
+
+    expect(frame.invoiceListMode()).toBe('demo');
+    expect(frame.displayedInvoices()).toHaveLength(3);
+    expect(frame.displayedReadStatus()).toBe('idle');
+
+    frame.invoiceListMode.set('http');
+
+    expect(frame.displayedInvoices().map(invoice => invoice.id))
+      .toEqual(['real-invoice-001']);
+    expect(frame.displayedReadStatus()).toBe('success');
+
+    frame.invoiceReadState.set({
+      status: 'error',
+      invoices: [],
+    });
+
+    expect(frame.displayedInvoices()).toEqual([]);
+    expect(frame.displayedReadStatus()).toBe('error');
+    expect(capabilities.http.request).not.toHaveBeenCalled();
+  } finally {
+    injector.destroy();
+  }
+});
