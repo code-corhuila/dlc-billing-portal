@@ -1,3 +1,4 @@
+
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import type { InvoiceListItem, InvoiceListStatus } from '../model/invoice-list-item';
@@ -21,9 +22,14 @@ type BillingInvoiceStatusFilter = 'ALL' | InvoiceListStatus;
         <p>
           Consulta las facturas y su estado de pago.
         </p>
-        <p role="note">Demostración con datos ficticios. Sin conexión con Billing API.</p>
+        @if (readOnly) {
+          <p role="note">Consulta de facturas en modo de solo lectura. El detalle y los pagos no están disponibles.</p>
+        } @else {
+          <p role="note">Demostración con datos ficticios. Sin conexión con Billing API.</p>
+        }
       </header>
 
+      @if (showDemoSummary) {
       <section class="summary" aria-label="Resumen de facturación">
         <article>
           <p>Ingresos del mes</p>
@@ -50,6 +56,7 @@ type BillingInvoiceStatusFilter = 'ALL' | InvoiceListStatus;
           </strong>
         </article>
       </section>
+      }
 
       <section class="invoice-panel" aria-labelledby="invoice-list-title">
         <h2 id="invoice-list-title">
@@ -65,7 +72,7 @@ type BillingInvoiceStatusFilter = 'ALL' | InvoiceListStatus;
             #searchInput
             id="invoice-search"
             type="search"
-            placeholder="Factura o paciente"
+            [placeholder]="readOnly ? 'Factura o ID del paciente' : 'Factura o paciente'"
             [value]="searchTerm"
             (input)="updateSearchTerm(searchInput.value)"
           />
@@ -116,10 +123,12 @@ type BillingInvoiceStatusFilter = 'ALL' | InvoiceListStatus;
             <thead>
               <tr>
                 <th>Factura</th>
-                <th>Paciente</th>
+                <th>{{ patientColumnLabel }}</th>
                 <th>Valor</th>
                 <th>Estado</th>
-                <th>Acción</th>
+                @if (canOpenInvoice) {
+                  <th>Acción</th>
+                }
               </tr>
             </thead>
 
@@ -134,7 +143,7 @@ type BillingInvoiceStatusFilter = 'ALL' | InvoiceListStatus;
                   </td>
 
                   <td>
-                    {{ invoice.patientName }}
+                    {{ displayPatient(invoice) }}
                   </td>
 
                   <td>
@@ -146,6 +155,7 @@ type BillingInvoiceStatusFilter = 'ALL' | InvoiceListStatus;
                     {{ statusLabels[invoice.status] }}
                   </td>
 
+                  @if (canOpenInvoice) {
                   <td>
                     @if (composed) {
                       <button type="button" (click)="openInvoice.emit(invoice.id)"
@@ -156,11 +166,19 @@ type BillingInvoiceStatusFilter = 'ALL' | InvoiceListStatus;
                       Ver factura
                     </a> }
                   </td>
+                  }
                 </tr>
               }
             </tbody>
           </table>
           </div>
+
+          @if (readOnly) {
+            <p role="note">
+              Los filtros y la paginación se aplican únicamente a las facturas recibidas,
+              no a todas las facturas del sistema.
+            </p>
+          }
 
           <nav aria-label="Paginación de facturas">
             <button
@@ -190,6 +208,7 @@ type BillingInvoiceStatusFilter = 'ALL' | InvoiceListStatus;
 })
 export class BillingListPageComponent {
   @Input() composed = false;
+  @Input() readOnly = false;
   @Output() readonly openInvoice = new EventEmitter<string>();
   readonly statusLabels: Record<InvoiceListStatus, string> = {
     DRAFT: 'Borrador', ISSUED: 'Emitida', PARTIALLY_PAID: 'Pago parcial',
@@ -211,6 +230,22 @@ export class BillingListPageComponent {
   currentPage = 1;
 
   @Input() invoices: InvoiceListItem[] = [];
+
+  get showDemoSummary(): boolean {
+    return !this.readOnly;
+  }
+
+  get canOpenInvoice(): boolean {
+    return !this.readOnly;
+  }
+
+  get patientColumnLabel(): string {
+    return this.readOnly ? 'ID del paciente' : 'Paciente';
+  }
+
+  displayPatient(invoice: InvoiceListItem): string {
+    return invoice.patientName;
+  }
 
   get filteredInvoices(): InvoiceListItem[] {
     const normalizedSearchTerm =
@@ -290,7 +325,7 @@ export class BillingListPageComponent {
     }
   }
 
-  getInvoiceDetailPath(invoiceId: string): string {
-    return `invoices/${invoiceId}`;
+  getInvoiceDetailPath(invoiceId: string): string | null {
+    return this.readOnly ? null : `invoices/${invoiceId}`;
   }
 }
