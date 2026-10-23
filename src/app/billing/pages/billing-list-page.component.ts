@@ -1,9 +1,11 @@
+
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import type { InvoiceListItem, InvoiceListStatus } from '../model/invoice-list-item';
 import { copMoney } from '../model/cop-money';
 import { formatCopMoney } from '../presentation/format-cop-money';
 import { INVOICE_STATUSES } from '../model/generated/invoice-contract.generated';
+
 type BillingInvoiceStatusFilter = 'ALL' | InvoiceListStatus;
 
 @Component({
@@ -15,94 +17,67 @@ type BillingInvoiceStatusFilter = 'ALL' | InvoiceListStatus;
     <section class="billing-page" aria-label="Facturación y pagos">
       <header>
         <p>Billing</p>
-
         <h1 tabindex="-1">Facturación y pagos</h1>
+        <p>Consulta las facturas y su estado de pago.</p>
 
-        <p>
-          Consulta las facturas y su estado de pago.
-        </p>
-        <p role="note">Demostración con datos ficticios. Sin conexión con Billing API.</p>
+        @if (readOnly) {
+          <p role="note">
+            Consulta de facturas en modo de solo lectura.
+            El detalle y los pagos no están disponibles.
+          </p>
+        } @else {
+          <p role="note">
+            Demostración con datos ficticios. Sin conexión con Billing API.
+          </p>
+        }
       </header>
 
-      <section class="summary" aria-label="Resumen de facturación">
-        <article>
-          <p>Ingresos del mes</p>
+      @if (showDemoSummary) {
+        <section class="summary" aria-label="Resumen de facturación">
+          <article>
+            <p>Ingresos del mes</p>
+            <strong>COP {{ formatAmount(monthlyIncome) }}</strong>
+          </article>
 
-          <strong>
-            COP
-            {{ formatAmount(monthlyIncome) }}
-          </strong>
-        </article>
+          <article>
+            <p>Facturas pendientes</p>
+            <strong>{{ pendingInvoices }}</strong>
+          </article>
 
-        <article>
-          <p>Facturas pendientes</p>
-
-          <strong>
-            {{ pendingInvoices }}
-          </strong>
-        </article>
-
-        <article>
-          <p>Facturas pagadas</p>
-
-          <strong>
-            {{ paidInvoices }}
-          </strong>
-        </article>
-      </section>
+          <article>
+            <p>Facturas pagadas</p>
+            <strong>{{ paidInvoices }}</strong>
+          </article>
+        </section>
+      }
 
       <section class="invoice-panel" aria-labelledby="invoice-list-title">
-        <h2 id="invoice-list-title">
-          Facturas
-        </h2>
+        <h2 id="invoice-list-title">Facturas</h2>
 
         <div class="filters">
-          <label for="invoice-search">
-            Buscar factura
-          </label>
-
+          <label for="invoice-search">Buscar factura</label>
           <input
             #searchInput
             id="invoice-search"
             type="search"
-            placeholder="Factura o paciente"
+            [placeholder]="readOnly ? 'Factura o ID del paciente' : 'Factura o paciente'"
             [value]="searchTerm"
             (input)="updateSearchTerm(searchInput.value)"
           />
 
-          <label for="invoice-status">
-            Estado
-          </label>
-
+          <label for="invoice-status">Estado</label>
           <select
             #statusSelect
             id="invoice-status"
             [value]="selectedStatus"
             (change)="updateSelectedStatus(statusSelect.value)"
           >
-            <option value="ALL">
-              Todos
-            </option>
-
-            <option value="DRAFT">
-              Borrador
-            </option>
-
-            <option value="ISSUED">
-              Emitida
-            </option>
-
-            <option value="PARTIALLY_PAID">
-              Pago parcial
-            </option>
-
-            <option value="PAID">
-              Pagada
-            </option>
-
-            <option value="CANCELLED">
-              Cancelada
-            </option>
+            <option value="ALL">Todos</option>
+            <option value="DRAFT">Borrador</option>
+            <option value="ISSUED">Emitida</option>
+            <option value="PARTIALLY_PAID">Pago parcial</option>
+            <option value="PAID">Pagada</option>
+            <option value="CANCELLED">Cancelada</option>
           </select>
         </div>
 
@@ -111,56 +86,62 @@ type BillingInvoiceStatusFilter = 'ALL' | InvoiceListStatus;
             No se encontraron facturas con los filtros seleccionados.
           </p>
         } @else {
-          <div class="table-scroll" tabindex="0" role="region" aria-label="Tabla de facturas">
-          <table>
-            <thead>
-              <tr>
-                <th>Factura</th>
-                <th>Paciente</th>
-                <th>Valor</th>
-                <th>Estado</th>
-                <th>Acción</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              @for (
-                invoice of paginatedInvoices;
-                track invoice.id
-              ) {
+          <div
+            class="table-scroll"
+            tabindex="0"
+            role="region"
+            aria-label="Tabla de facturas"
+          >
+            <table>
+              <thead>
                 <tr>
-                  <td>
-                    {{ invoice.number }}
-                  </td>
-
-                  <td>
-                    {{ invoice.patientName }}
-                  </td>
-
-                  <td>
-                    COP
-                    {{ formatAmount(invoice.amount) }}
-                  </td>
-
-                  <td>
-                    {{ statusLabels[invoice.status] }}
-                  </td>
-
-                  <td>
-                    @if (composed) {
-                      <button type="button" (click)="openInvoice.emit(invoice.id)"
-                        [attr.aria-label]="'Ver factura ' + invoice.number">Ver factura</button>
-                    } @else { <a
-                      [routerLink]="getInvoiceDetailPath(invoice.id)"
-                    >
-                      Ver factura
-                    </a> }
-                  </td>
+                  <th>Factura</th>
+                  <th>{{ patientColumnLabel }}</th>
+                  <th>Valor</th>
+                  <th>Estado</th>
+                  @if (canOpenInvoice) {
+                    <th>Acción</th>
+                  }
                 </tr>
-              }
-            </tbody>
-          </table>
+              </thead>
+
+              <tbody>
+                @for (invoice of paginatedInvoices; track invoice.id) {
+                  <tr>
+                    <td>{{ invoice.number }}</td>
+                    <td>{{ displayPatient(invoice) }}</td>
+                    <td>COP {{ formatAmount(invoice.amount) }}</td>
+                    <td>{{ statusLabels[invoice.status] }}</td>
+
+                    @if (canOpenInvoice) {
+                      <td>
+                        @if (composed) {
+                          <button
+                            type="button"
+                            (click)="openInvoice.emit(invoice.id)"
+                            [attr.aria-label]="'Ver factura ' + invoice.number"
+                          >
+                            Ver factura
+                          </button>
+                        } @else {
+                          <a [routerLink]="getInvoiceDetailPath(invoice.id)">
+                            Ver factura
+                          </a>
+                        }
+                      </td>
+                    }
+                  </tr>
+                }
+              </tbody>
+            </table>
           </div>
+
+          @if (readOnly) {
+            <p role="note">
+              Los filtros y la paginación se aplican únicamente a las
+              facturas recibidas, no a todas las facturas del sistema.
+            </p>
+          }
 
           <nav aria-label="Paginación de facturas">
             <button
@@ -171,9 +152,7 @@ type BillingInvoiceStatusFilter = 'ALL' | InvoiceListStatus;
               Anterior
             </button>
 
-            <span>
-              Página {{ currentPage }} de {{ totalPages }}
-            </span>
+            <span>Página {{ currentPage }} de {{ totalPages }}</span>
 
             <button
               type="button"
@@ -190,43 +169,65 @@ type BillingInvoiceStatusFilter = 'ALL' | InvoiceListStatus;
 })
 export class BillingListPageComponent {
   @Input() composed = false;
+  @Input() readOnly = false;
+  @Input() invoices: InvoiceListItem[] = [];
+
   @Output() readonly openInvoice = new EventEmitter<string>();
+
   readonly statusLabels: Record<InvoiceListStatus, string> = {
-    DRAFT: 'Borrador', ISSUED: 'Emitida', PARTIALLY_PAID: 'Pago parcial',
-    PAID: 'Pagada', CANCELLED: 'Cancelada',
+    DRAFT: 'Borrador',
+    ISSUED: 'Emitida',
+    PARTIALLY_PAID: 'Pago parcial',
+    PAID: 'Pagada',
+    CANCELLED: 'Cancelada',
   };
+
   readonly monthlyIncome = copMoney('250000.00');
   readonly formatAmount = formatCopMoney;
-  get pendingInvoices(): number {
-    return this.invoices.filter(invoice => ['ISSUED', 'PARTIALLY_PAID'].includes(invoice.status)).length;
-  }
-  get paidInvoices(): number {
-    return this.invoices.filter(invoice => invoice.status === 'PAID').length;
-  }
-
   readonly pageSize = 2;
 
   searchTerm = '';
   selectedStatus: BillingInvoiceStatusFilter = 'ALL';
   currentPage = 1;
 
-  @Input() invoices: InvoiceListItem[] = [];
+  get showDemoSummary(): boolean {
+    return !this.readOnly;
+  }
+
+  get canOpenInvoice(): boolean {
+    return !this.readOnly;
+  }
+
+  get patientColumnLabel(): string {
+    return this.readOnly ? 'ID del paciente' : 'Paciente';
+  }
+
+  displayPatient(invoice: InvoiceListItem): string {
+    return invoice.patientName;
+  }
+
+  get pendingInvoices(): number {
+    return this.invoices.filter(invoice =>
+      ['ISSUED', 'PARTIALLY_PAID'].includes(invoice.status)
+    ).length;
+  }
+
+  get paidInvoices(): number {
+    return this.invoices.filter(invoice =>
+      invoice.status === 'PAID'
+    ).length;
+  }
 
   get filteredInvoices(): InvoiceListItem[] {
-    const normalizedSearchTerm =
-      this.searchTerm
-        .trim()
-        .toLocaleLowerCase('es-CO');
+    const normalizedSearchTerm = this.searchTerm
+      .trim()
+      .toLocaleLowerCase('es-CO');
 
-    return this.invoices.filter((invoice) => {
+    return this.invoices.filter(invoice => {
       const matchesSearch =
         normalizedSearchTerm.length === 0 ||
-        invoice.number
-          .toLocaleLowerCase('es-CO')
-          .includes(normalizedSearchTerm) ||
-        invoice.patientName
-          .toLocaleLowerCase('es-CO')
-          .includes(normalizedSearchTerm);
+        invoice.number.toLocaleLowerCase('es-CO').includes(normalizedSearchTerm) ||
+        invoice.patientName.toLocaleLowerCase('es-CO').includes(normalizedSearchTerm);
 
       const matchesStatus =
         this.selectedStatus === 'ALL' ||
@@ -239,16 +240,12 @@ export class BillingListPageComponent {
   get totalPages(): number {
     return Math.max(
       1,
-      Math.ceil(
-        this.filteredInvoices.length / this.pageSize,
-      ),
+      Math.ceil(this.filteredInvoices.length / this.pageSize),
     );
   }
 
   get paginatedInvoices(): InvoiceListItem[] {
-    const startIndex =
-      (this.currentPage - 1) * this.pageSize;
-
+    const startIndex = (this.currentPage - 1) * this.pageSize;
     return this.filteredInvoices.slice(
       startIndex,
       startIndex + this.pageSize,
@@ -266,14 +263,8 @@ export class BillingListPageComponent {
       ...INVOICE_STATUSES,
     ];
 
-    if (
-      allowedStatuses.includes(
-        value as BillingInvoiceStatusFilter,
-      )
-    ) {
-      this.selectedStatus =
-        value as BillingInvoiceStatusFilter;
-
+    if (allowedStatuses.includes(value as BillingInvoiceStatusFilter)) {
+      this.selectedStatus = value as BillingInvoiceStatusFilter;
       this.currentPage = 1;
     }
   }
@@ -290,7 +281,8 @@ export class BillingListPageComponent {
     }
   }
 
-  getInvoiceDetailPath(invoiceId: string): string {
-    return `invoices/${invoiceId}`;
+  getInvoiceDetailPath(invoiceId: string): string | null {
+    return this.readOnly ? null : `invoices/${invoiceId}`;
   }
 }
+
