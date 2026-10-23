@@ -329,4 +329,3 @@ export class BillingListPageComponent {
     return this.readOnly ? null : `invoices/${invoiceId}`;
   }
 }
-
