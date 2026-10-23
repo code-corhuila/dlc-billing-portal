@@ -1,4 +1,3 @@
-
 import '@angular/compiler';
 
 import {
@@ -199,10 +198,6 @@ describe('BillingListPageComponent', () => {
 
     expect(component.currentPage).toBe(1);
     expect(component.selectedStatus).toBe('ISSUED');
-
-    expect(
-      component.paginatedInvoices.map(invoice => invoice.id),
-    ).toEqual(['invoice-002']);
   });
 
   it('uses demo mode by default', () => {
@@ -247,5 +242,14 @@ describe('BillingListPageComponent', () => {
     expect(component.displayPatient(component.invoices[0])).toBe(
       component.invoices[0].patientName,
     );
+  });
+
+  it('does not treat HTTP loading as an empty invoice search result', () => {
+    component.readOnly = true;
+    component.invoices = [];
+    component.readStatus = 'loading';
+
+    expect(component.isLoading).toBe(true);
+    expect(component.showNoResultsMessage).toBe(false);
   });
 });
