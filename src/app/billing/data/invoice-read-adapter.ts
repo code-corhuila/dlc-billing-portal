@@ -36,7 +36,7 @@ function requireString(value: unknown, field: string): string {
   return value;
 }
 
-function readInvoice(value: unknown): ReadInvoice {
+export function readInvoiceDetail(value: unknown): ReadInvoice {
   if (!isRecord(value)) {
     throw new Error('Invalid invoice');
   }
@@ -101,7 +101,7 @@ export function readInvoicePage(value: unknown): ReadInvoicePage {
   }
 
   return {
-    data: value['data'].map(readInvoice),
+    data: value['data'].map(readInvoiceDetail),
     meta: { ...value['meta'] },
   };
 }
