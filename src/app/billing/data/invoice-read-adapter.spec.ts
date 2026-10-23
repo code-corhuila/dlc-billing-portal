@@ -1,6 +1,5 @@
-
 import { describe, expect, it } from 'vitest';
-import { readInvoicePage } from './invoice-read-adapter';
+import { readInvoiceDetail, readInvoicePage } from './invoice-read-adapter';
 
 describe('invoice read adapter', () => {
   const validInvoice = {
@@ -97,5 +96,36 @@ describe('invoice read adapter', () => {
     expect(() => readInvoicePage({
       data: [validInvoice],
     })).toThrow();
+  });
+
+  it('reads a single invoice without requiring pagination', () => {
+    const result = readInvoiceDetail(validInvoice);
+
+    expect(result.id).toBe(validInvoice.id);
+    expect(result.patientId).toBe(validInvoice.patientId);
+    expect(result.status).toBe('DRAFT');
+    expect(result.version).toBe(1);
+    expect(result.items).toEqual([]);
+  });
+
+  it('preserves the invoice version and exact COP amounts', () => {
+    const result = readInvoiceDetail({
+      ...validInvoice,
+      version: 7,
+      total: '999999999999.99',
+      balance: '0.01',
+    });
+
+    expect(result.version).toBe(7);
+    expect(result.total).toBe('999999999999.99');
+    expect(result.balance).toBe('0.01');
+    expect(result.currency).toBe('COP');
+  });
+
+  it('rejects a single invoice with an invalid version', () => {
+    expect(() => readInvoiceDetail({
+      ...validInvoice,
+      version: 0,
+    })).toThrow('Invalid invoice version');
   });
 });
