@@ -1,10 +1,11 @@
-
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import type { InvoiceListItem, InvoiceListStatus } from '../model/invoice-list-item';
 import { copMoney } from '../model/cop-money';
 import { formatCopMoney } from '../presentation/format-cop-money';
 import { INVOICE_STATUSES } from '../model/generated/invoice-contract.generated';
+import type { InvoiceReadStatus } from '../data/invoice-read-state';
+
 type BillingInvoiceStatusFilter = 'ALL' | InvoiceListStatus;
 
 @Component({
@@ -63,6 +64,11 @@ type BillingInvoiceStatusFilter = 'ALL' | InvoiceListStatus;
           Facturas
         </h2>
 
+        @if (isLoading) {
+          <p role="status" aria-live="polite">Cargando facturas...</p>
+        } @else if (readFeedback !== null) {
+          <p role="status" aria-live="polite">{{ readFeedback }}</p>
+        } @else {
         <div class="filters">
           <label for="invoice-search">
             Buscar factura
@@ -113,7 +119,7 @@ type BillingInvoiceStatusFilter = 'ALL' | InvoiceListStatus;
           </select>
         </div>
 
-        @if (filteredInvoices.length === 0) {
+        @if (showNoResultsMessage) {
           <p role="status">
             No se encontraron facturas con los filtros seleccionados.
           </p>
@@ -202,6 +208,7 @@ type BillingInvoiceStatusFilter = 'ALL' | InvoiceListStatus;
             </button>
           </nav>
         }
+        }
       </section>
     </section>
   `,
@@ -209,6 +216,7 @@ type BillingInvoiceStatusFilter = 'ALL' | InvoiceListStatus;
 export class BillingListPageComponent {
   @Input() composed = false;
   @Input() readOnly = false;
+  @Input() readStatus: InvoiceReadStatus = 'idle';
   @Output() readonly openInvoice = new EventEmitter<string>();
   readonly statusLabels: Record<InvoiceListStatus, string> = {
     DRAFT: 'Borrador', ISSUED: 'Emitida', PARTIALLY_PAID: 'Pago parcial',
@@ -230,6 +238,31 @@ export class BillingListPageComponent {
   currentPage = 1;
 
   @Input() invoices: InvoiceListItem[] = [];
+
+  get isLoading(): boolean {
+    return this.readOnly && this.readStatus === 'loading';
+  }
+
+  get readFeedback(): string | null {
+    if (!this.readOnly) return null;
+
+    switch (this.readStatus) {
+      case 'error':
+        return 'No fue posible consultar las facturas.';
+      case 'cancelled':
+        return 'La consulta de facturas fue cancelada.';
+      case 'success':
+        return this.invoices.length === 0 ? 'No hay facturas disponibles.' : null;
+      default:
+        return null;
+    }
+  }
+
+  get showNoResultsMessage(): boolean {
+    return !this.isLoading &&
+      this.readFeedback === null &&
+      this.filteredInvoices.length === 0;
+  }
 
   get showDemoSummary(): boolean {
     return !this.readOnly;

@@ -1,4 +1,3 @@
-
 import '@angular/compiler';
 
 import {
@@ -247,5 +246,50 @@ describe('BillingListPageComponent', () => {
     expect(component.displayPatient(component.invoices[0])).toBe(
       component.invoices[0].patientName,
     );
+  });
+
+  it('does not treat HTTP loading as an empty invoice search result', () => {
+    component.readOnly = true;
+    component.invoices = [];
+    component.readStatus = 'loading';
+
+    expect(component.isLoading).toBe(true);
+    expect(component.showNoResultsMessage).toBe(false);
+  });
+
+  it('presents HTTP errors without displaying an empty-search message', () => {
+    component.readOnly = true;
+    component.invoices = [];
+    component.readStatus = 'error';
+
+    expect(component.readFeedback).toBe('No fue posible consultar las facturas.');
+    expect(component.showNoResultsMessage).toBe(false);
+  });
+
+  it('presents HTTP cancellation separately from empty results', () => {
+    component.readOnly = true;
+    component.invoices = [];
+    component.readStatus = 'cancelled';
+
+    expect(component.readFeedback).toBe('La consulta de facturas fue cancelada.');
+    expect(component.showNoResultsMessage).toBe(false);
+  });
+
+  it('identifies a successful HTTP response with no invoices', () => {
+    component.readOnly = true;
+    component.invoices = [];
+    component.readStatus = 'success';
+
+    expect(component.readFeedback).toBe('No hay facturas disponibles.');
+    expect(component.showNoResultsMessage).toBe(false);
+  });
+
+  it('preserves filter feedback when HTTP invoices have no matches', () => {
+    component.readOnly = true;
+    component.readStatus = 'success';
+    component.updateSearchTerm('invoice-that-does-not-exist');
+
+    expect(component.readFeedback).toBeNull();
+    expect(component.showNoResultsMessage).toBe(true);
   });
 });
