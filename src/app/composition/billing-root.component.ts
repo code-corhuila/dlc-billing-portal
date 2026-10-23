@@ -1,5 +1,3 @@
-
-
 import { Component, DestroyRef, InjectionToken, computed, inject, signal, viewChild } from '@angular/core';
 import { PortalContext } from '../shell-contract';
 import { BillingListPageComponent } from '../billing/pages/billing-list-page.component';
@@ -36,6 +34,7 @@ export class BillingCompositionRoot {
   private readonly context = inject(BILLING_CONTEXT);
   private readonly destroyRef = inject(DestroyRef);
   private navigationGeneration = 0;
+  private invoiceRequestGeneration = 0;
   private pendingInvoice?: string;
   private readonly source = inject(INVOICE_LIST_SOURCE);
 
@@ -59,11 +58,15 @@ export class BillingCompositionRoot {
   async loadInvoices(): Promise<void> {
     if (this.isInactive()) return;
 
+    const generation = ++this.invoiceRequestGeneration;
+
     await loadInvoiceReadState(
       this.context,
       this.invoiceReadState(),
       state => {
-        if (!this.isInactive()) this.invoiceReadState.set(state);
+        if (!this.isInactive() && generation === this.invoiceRequestGeneration) {
+          this.invoiceReadState.set(state);
+        }
       },
     );
   }
@@ -92,6 +95,7 @@ export class BillingCompositionRoot {
     const id = this.invoiceId();
     return id === undefined ? undefined : this.payments.detail(id);
   });
+
   readonly navigationMessage = signal('');
   readonly title = computed(() => this.route().localPath === '/'
     ? 'Facturación' : 'Página no encontrada');
