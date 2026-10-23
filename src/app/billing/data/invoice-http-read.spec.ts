@@ -1,7 +1,9 @@
-
 import { describe, expect, it, vi } from 'vitest';
 import type { PortalContext } from '../../shell-contract';
-import { readInvoicesHttp } from './invoice-http-read';
+import {
+  readInvoiceDetailHttp,
+  readInvoicesHttp,
+} from './invoice-http-read';
 
 describe('invoice HTTP read', () => {
   const invoice = {
@@ -107,5 +109,106 @@ describe('invoice HTTP read', () => {
     );
 
     expect(request).not.toHaveBeenCalled();
+  });
+
+  it('reads a single invoice using the shared HTTP client', async () => {
+    const { context, request } = setup();
+
+    request.mockResolvedValue({
+      ok: true,
+      status: 200,
+      data: invoice,
+      headers: {},
+      correlationId: 'correlation-1',
+    });
+
+    const result = await readInvoiceDetailHttp(context, invoice.id);
+
+    expect(request).toHaveBeenCalledExactlyOnceWith({
+      method: 'GET',
+      path: `/api/v1/invoices/${invoice.id}`,
+      signal: context.signal,
+    });
+
+    expect(result).toMatchObject({
+      id: invoice.id,
+      patientId: invoice.patientId,
+      total: '150000.00',
+      balance: '150000.00',
+      status: 'DRAFT',
+      version: 1,
+    });
+  });
+
+  it('rejects an HTTP failure for invoice detail', async () => {
+    const { context, request } = setup();
+
+    request.mockResolvedValue({
+      ok: false,
+      status: 403,
+      error: 'FORBIDDEN',
+      message: 'Access denied',
+      details: null,
+      traceId: 'trace-1',
+      correlationId: 'correlation-1',
+      kind: 'http',
+      retryable: false,
+    });
+
+    await expect(
+      readInvoiceDetailHttp(context, invoice.id),
+    ).rejects.toThrow('Invoice request failed');
+  });
+
+  it('rejects malformed invoice detail responses', async () => {
+    const { context, request } = setup();
+
+    request.mockResolvedValue({
+      ok: true,
+      status: 200,
+      data: {
+        ...invoice,
+        version: 0,
+      },
+      headers: {},
+      correlationId: 'correlation-1',
+    });
+
+    await expect(
+      readInvoiceDetailHttp(context, invoice.id),
+    ).rejects.toThrow('Invalid invoice version');
+  });
+
+  it('does not request invoice detail after cancellation', async () => {
+    const { context, request, controller } = setup();
+    controller.abort();
+
+    await expect(
+      readInvoiceDetailHttp(context, invoice.id),
+    ).rejects.toThrow('Invoice request cancelled');
+
+    expect(request).not.toHaveBeenCalled();
+  });
+
+  it('rejects invoice detail when cancelled during the request', async () => {
+    const { context, request, controller } = setup();
+
+    request.mockImplementation(async () => {
+      controller.abort();
+
+      return {
+        ok: true,
+        status: 200,
+        data: invoice,
+        headers: {},
+        correlationId: 'correlation-1',
+      };
+    });
+
+    await expect(
+      readInvoiceDetailHttp(context, invoice.id),
+    ).rejects.toThrow('Invoice request cancelled');
+
+    expect(request).toHaveBeenCalledOnce();
   });
 });
