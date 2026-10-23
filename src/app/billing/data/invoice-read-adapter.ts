@@ -1,4 +1,3 @@
-
 import {
   INVOICE_STATUSES,
   type InvoiceStatus,
@@ -43,48 +42,48 @@ function readInvoice(value: unknown): ReadInvoice {
   }
 
   if (
-    typeof value.status !== 'string'
-    || !INVOICE_STATUSES.some(status => status === value.status)
+    typeof value['status'] !== 'string'
+    || !INVOICE_STATUSES.some(status => status === value['status'])
   ) {
     throw new Error('Invalid invoice status');
   }
 
   if (
-    !Number.isInteger(value.version)
-    || (value.version as number) < 1
+    !Number.isInteger(value['version'])
+    || (value['version'] as number) < 1
   ) {
     throw new Error('Invalid invoice version');
   }
 
-  if (!Array.isArray(value.items)) {
+  if (!Array.isArray(value['items'])) {
     throw new Error('Invalid invoice items');
   }
 
-  if (value.currency !== 'COP') {
+  if (value['currency'] !== 'COP') {
     throw new Error('Invalid invoice currency');
   }
 
   const invoice: ReadInvoice = {
-    id: requireString(value.id, 'id'),
-    patientId: requireString(value.patientId, 'patientId'),
-    items: [...value.items],
-    total: copMoney(value.total),
-    balance: copMoney(value.balance),
+    id: requireString(value['id'], 'id'),
+    patientId: requireString(value['patientId'], 'patientId'),
+    items: [...value['items']],
+    total: copMoney(value['total']),
+    balance: copMoney(value['balance']),
     currency: 'COP',
-    status: value.status as InvoiceStatus,
-    version: value.version as number,
+    status: value['status'] as InvoiceStatus,
+    version: value['version'] as number,
   };
 
-  if (value.appointmentId !== undefined) {
+  if (value['appointmentId'] !== undefined) {
     invoice.appointmentId = requireString(
-      value.appointmentId,
+      value['appointmentId'],
       'appointmentId',
     );
   }
 
-  if (value.invoiceNumber !== undefined) {
+  if (value['invoiceNumber'] !== undefined) {
     invoice.invoiceNumber = requireString(
-      value.invoiceNumber,
+      value['invoiceNumber'],
       'invoiceNumber',
     );
   }
@@ -97,12 +96,12 @@ export function readInvoicePage(value: unknown): ReadInvoicePage {
     throw new Error('Invalid invoice page');
   }
 
-  if (!Array.isArray(value.data) || !isRecord(value.meta)) {
+  if (!Array.isArray(value['data']) || !isRecord(value['meta'])) {
     throw new Error('Invalid invoice page structure');
   }
 
   return {
-    data: value.data.map(readInvoice),
-    meta: { ...value.meta },
+    data: value['data'].map(readInvoice),
+    meta: { ...value['meta'] },
   };
 }
