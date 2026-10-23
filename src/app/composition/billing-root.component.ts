@@ -16,7 +16,9 @@ export const BILLING_CONTEXT = new InjectionToken<PortalContext>('billing.contex
   standalone: true,
   imports: [BillingListPageComponent, InvoiceDetailPageComponent, PricingCatalogComponent, InvoicePaymentPageComponent],
   template: `@if (isInvoiceList()) {
-    <dlc-billing-list-page [composed]="true" [invoices]="invoices" (openInvoice)="openInvoice($event)" />
+    <dlc-billing-list-page [composed]="true" [readOnly]="invoiceListMode() === 'http'"
+      [readStatus]="displayedReadStatus()" [invoices]="displayedInvoices()"
+      (openInvoice)="openInvoice($event)" />
   } @else if (isInvoiceDetail()) {
     <dlc-invoice-detail-page [invoice]="selectedInvoice()" [canPay]="canRecordPayments()"
       (pay)="openPayment($event)" (back)="backToList()" />
@@ -40,6 +42,19 @@ export class BillingCompositionRoot {
 
   readonly session = signal(this.context.session.getSnapshot());
   readonly invoiceReadState = signal(createInvoiceReadState());
+  readonly invoiceListMode = signal<'demo' | 'http'>('demo');
+
+  readonly displayedInvoices = computed(() =>
+    this.invoiceListMode() === 'http'
+      ? this.invoiceReadState().invoices
+      : this.invoices,
+  );
+
+  readonly displayedReadStatus = computed(() =>
+    this.invoiceListMode() === 'http'
+      ? this.invoiceReadState().status
+      : 'idle',
+  );
 
   readonly canManagePrices = computed(() => this.session()?.state === 'authenticated'
     && this.session()?.user?.roles.includes('ADMINISTRATOR') === true);
