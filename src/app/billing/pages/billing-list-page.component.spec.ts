@@ -198,6 +198,10 @@ describe('BillingListPageComponent', () => {
 
     expect(component.currentPage).toBe(1);
     expect(component.selectedStatus).toBe('ISSUED');
+
+    expect(
+      component.paginatedInvoices.map(invoice => invoice.id),
+    ).toEqual(['invoice-002']);
   });
 
   it('uses demo mode by default', () => {
@@ -251,5 +255,41 @@ describe('BillingListPageComponent', () => {
 
     expect(component.isLoading).toBe(true);
     expect(component.showNoResultsMessage).toBe(false);
+  });
+
+  it('presents HTTP errors without displaying an empty-search message', () => {
+    component.readOnly = true;
+    component.invoices = [];
+    component.readStatus = 'error';
+
+    expect(component.readFeedback).toBe('No fue posible consultar las facturas.');
+    expect(component.showNoResultsMessage).toBe(false);
+  });
+
+  it('presents HTTP cancellation separately from empty results', () => {
+    component.readOnly = true;
+    component.invoices = [];
+    component.readStatus = 'cancelled';
+
+    expect(component.readFeedback).toBe('La consulta de facturas fue cancelada.');
+    expect(component.showNoResultsMessage).toBe(false);
+  });
+
+  it('identifies a successful HTTP response with no invoices', () => {
+    component.readOnly = true;
+    component.invoices = [];
+    component.readStatus = 'success';
+
+    expect(component.readFeedback).toBe('No hay facturas disponibles.');
+    expect(component.showNoResultsMessage).toBe(false);
+  });
+
+  it('preserves filter feedback when HTTP invoices have no matches', () => {
+    component.readOnly = true;
+    component.readStatus = 'success';
+    component.updateSearchTerm('invoice-that-does-not-exist');
+
+    expect(component.readFeedback).toBeNull();
+    expect(component.showNoResultsMessage).toBe(true);
   });
 });
