@@ -66,6 +66,8 @@ type BillingInvoiceStatusFilter = 'ALL' | InvoiceListStatus;
 
         @if (isLoading) {
           <p role="status" aria-live="polite">Cargando facturas...</p>
+        } @else if (readFeedback !== null) {
+          <p role="status" aria-live="polite">{{ readFeedback }}</p>
         } @else {
         <div class="filters">
           <label for="invoice-search">
@@ -241,8 +243,25 @@ export class BillingListPageComponent {
     return this.readOnly && this.readStatus === 'loading';
   }
 
+  get readFeedback(): string | null {
+    if (!this.readOnly) return null;
+
+    switch (this.readStatus) {
+      case 'error':
+        return 'No fue posible consultar las facturas.';
+      case 'cancelled':
+        return 'La consulta de facturas fue cancelada.';
+      case 'success':
+        return this.invoices.length === 0 ? 'No hay facturas disponibles.' : null;
+      default:
+        return null;
+    }
+  }
+
   get showNoResultsMessage(): boolean {
-    return !this.isLoading && this.filteredInvoices.length === 0;
+    return !this.isLoading &&
+      this.readFeedback === null &&
+      this.filteredInvoices.length === 0;
   }
 
   get showDemoSummary(): boolean {
