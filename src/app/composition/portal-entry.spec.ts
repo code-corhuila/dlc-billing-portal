@@ -1,5 +1,6 @@
 
 
+
 import '@angular/compiler';
 import { createApplication } from '@angular/platform-browser';
 import { ErrorHandler, Injector, runInInjectionContext, signal } from '@angular/core';
@@ -175,6 +176,64 @@ it('initializes invoice HTTP read state without replacing demo invoices', async 
     expect(frame.invoiceReadState()).toEqual({
       status: 'idle',
       invoices: [],
+    });
+    expect(frame.invoices).toHaveLength(3);
+  } finally {
+    injector.destroy();
+  }
+});
+
+it('loads HTTP invoices through the composition root without changing demo invoices', async () => {
+  const { BILLING_CONTEXT, BillingCompositionRoot } =
+    await import('./billing-root.component');
+  const capabilities = context();
+  let resolveRequest!: (response: unknown) => void;
+  capabilities.http.request.mockReturnValue(new Promise(resolve => {
+    resolveRequest = resolve;
+  }));
+  const injector = Injector.create({
+    providers: [provideInvoiceListSource(), { provide: BILLING_CONTEXT, useValue: capabilities }],
+  });
+
+  try {
+    const frame = runInInjectionContext(injector, () => new BillingCompositionRoot());
+    const pending = frame.loadInvoices();
+
+    expect(frame.invoiceReadState()).toEqual({ status: 'loading', invoices: [] });
+    expect(capabilities.http.request).toHaveBeenCalledWith({
+      method: 'GET',
+      path: '/api/v1/invoices',
+      signal: capabilities.signal,
+    });
+
+    resolveRequest({
+      ok: true,
+      data: {
+        data: [{
+          id: 'real-invoice-001',
+          patientId: 'patient-001',
+          invoiceNumber: 'INV-001',
+          items: [],
+          total: '150000.00',
+          balance: '150000.00',
+          currency: 'COP',
+          status: 'ISSUED',
+          version: 1,
+        }],
+        meta: {},
+      },
+    });
+    await pending;
+
+    expect(frame.invoiceReadState()).toEqual({
+      status: 'success',
+      invoices: [{
+        id: 'real-invoice-001',
+        number: 'INV-001',
+        patientName: 'patient-001',
+        amount: '150000.00',
+        status: 'ISSUED',
+      }],
     });
     expect(frame.invoices).toHaveLength(3);
   } finally {
