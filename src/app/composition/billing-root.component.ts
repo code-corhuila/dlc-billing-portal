@@ -1,8 +1,10 @@
 
+
 import { Component, DestroyRef, InjectionToken, computed, inject, signal, viewChild } from '@angular/core';
 import { PortalContext } from '../shell-contract';
 import { BillingListPageComponent } from '../billing/pages/billing-list-page.component';
 import { INVOICE_LIST_SOURCE } from '../billing/data/invoice-list-source';
+import { loadInvoiceReadState } from '../billing/data/invoice-read-flow';
 import { createInvoiceReadState } from '../billing/data/invoice-read-state';
 import { InvoiceDetailPageComponent } from '../billing/pages/invoice-detail-page.component';
 import { PricingCatalogComponent } from '../billing/catalog/pages/pricing-catalog/pricing-catalog.component';
@@ -36,33 +38,54 @@ export class BillingCompositionRoot {
   private navigationGeneration = 0;
   private pendingInvoice?: string;
   private readonly source = inject(INVOICE_LIST_SOURCE);
+
   readonly session = signal(this.context.session.getSnapshot());
   readonly invoiceReadState = signal(createInvoiceReadState());
+
   readonly canManagePrices = computed(() => this.session()?.state === 'authenticated'
     && this.session()?.user?.roles.includes('ADMINISTRATOR') === true);
+
   constructor() {
     this.destroyRef.onDestroy(this.context.session.subscribe(snapshot => {
       if (!this.isInactive()) this.session.set(snapshot);
     }));
   }
+
   readonly route = signal(this.context.route);
   readonly payments = new DemoInvoicePayments(this.source);
+
   get invoices() { return this.payments.read(); }
+
+  async loadInvoices(): Promise<void> {
+    if (this.isInactive()) return;
+
+    await loadInvoiceReadState(
+      this.context,
+      this.invoiceReadState(),
+      state => {
+        if (!this.isInactive()) this.invoiceReadState.set(state);
+      },
+    );
+  }
+
   readonly canRecordPayments = computed(() => this.session()?.state === 'authenticated'
     && this.session()?.user?.roles.some(role => ['ADMINISTRATOR', 'SECRETARY_ASSISTANT'].includes(role)) === true);
   readonly isInvoiceList = computed(() => this.route().localPath === '/');
   readonly isProcedures = computed(() => this.route().localPath === '/procedures');
   readonly catalog = viewChild(PricingCatalogComponent);
   readonly paymentPage = viewChild(InvoicePaymentPageComponent);
+
   canLeave(): boolean {
     const page = this.catalog();
     return (!page || (!page.formVisible() && !page.submitting())) && !this.paymentPage()?.dirty;
   }
+
   private readonly invoiceId = computed(() => {
     const match = /^\/invoices\/([^/]+)(\/payment)?$/.exec(this.route().localPath);
     if (!match) return undefined;
     try { return decodeURIComponent(match[1]); } catch { return undefined; }
   });
+
   readonly isPaymentRoute = computed(() => this.invoiceId() !== undefined && this.route().localPath.endsWith('/payment'));
   readonly isInvoiceDetail = computed(() => this.invoiceId() !== undefined && !this.isPaymentRoute());
   readonly selectedInvoice = computed(() => {
@@ -75,15 +98,19 @@ export class BillingCompositionRoot {
   readonly message = computed(() => this.route().localPath === '/'
     ? 'La integración de Billing no está disponible.'
     : 'La ruta solicitada no está disponible en Billing.');
+
   async openInvoice(id: string): Promise<void> {
     await this.navigate(`${this.route().basePath}/invoices/${encodeURIComponent(id)}`);
   }
+
   async backToList(): Promise<void> {
     await this.navigate(this.route().basePath);
   }
+
   async openPayment(id: string): Promise<void> {
     if (this.canRecordPayments()) await this.navigate(`${this.route().basePath}/invoices/${encodeURIComponent(id)}/payment`);
   }
+
   private async navigate(path: string): Promise<void> {
     if (this.isInactive() || this.pendingInvoice === path) return;
     this.pendingInvoice = path;
@@ -102,6 +129,7 @@ export class BillingCompositionRoot {
       if (!this.isInactive() && generation === this.navigationGeneration) this.pendingInvoice = undefined;
     }
   }
+
   private isInactive(): boolean {
     return this.context.signal.aborted || this.destroyRef.destroyed;
   }
