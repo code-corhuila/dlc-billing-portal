@@ -30,7 +30,7 @@ export const BILLING_CONTEXT = new InjectionToken<PortalContext>('billing.contex
       (openInvoice)="openInvoice($event)" />
   } @else if (isInvoiceDetail()) {
     @if (useHttpInvoiceDetail()) {
-      <dlc-invoice-detail-http-page [readState]="invoiceDetailReadState()"
+      <dlc-invoice-detail-http-page [readState]="displayedInvoiceDetailReadState()"
         (back)="backToList()" />
     } @else {
       <dlc-invoice-detail-page [invoice]="selectedInvoice()" [canPay]="canRecordPayments()"
@@ -137,9 +137,29 @@ export class BillingCompositionRoot {
     try { return decodeURIComponent(match[1]); } catch { return undefined; }
   });
 
-  readonly isPaymentRoute = computed(() => this.invoiceId() !== undefined && this.route().localPath.endsWith('/payment'));
-  readonly isInvoiceDetail = computed(() => this.invoiceId() !== undefined && !this.isPaymentRoute());
-  readonly useHttpInvoiceDetail = computed(() => this.isInvoiceDetail() && this.invoiceListMode() === 'http');
+  readonly isPaymentRoute = computed(() =>
+    this.invoiceId() !== undefined && this.route().localPath.endsWith('/payment'));
+
+  readonly isInvoiceDetail = computed(() =>
+    this.invoiceId() !== undefined && !this.isPaymentRoute());
+
+  readonly useHttpInvoiceDetail = computed(() =>
+    this.isInvoiceDetail() && this.invoiceListMode() === 'http');
+
+  readonly displayedInvoiceDetailReadState = computed(() => {
+    if (!this.useHttpInvoiceDetail()) {
+      return createInvoiceDetailReadState();
+    }
+
+    const state = this.invoiceDetailReadState();
+    const routeInvoiceId = this.invoiceId();
+
+    if (state.invoice?.id !== undefined && state.invoice.id !== routeInvoiceId) {
+      return createInvoiceDetailReadState();
+    }
+
+    return state;
+  });
 
   readonly selectedInvoice = computed(() => {
     const id = this.invoiceId();
@@ -162,7 +182,9 @@ export class BillingCompositionRoot {
   }
 
   async openPayment(id: string): Promise<void> {
-    if (this.canRecordPayments()) await this.navigate(`${this.route().basePath}/invoices/${encodeURIComponent(id)}/payment`);
+    if (this.canRecordPayments()) {
+      await this.navigate(`${this.route().basePath}/invoices/${encodeURIComponent(id)}/payment`);
+    }
   }
 
   private async navigate(path: string): Promise<void> {
@@ -180,7 +202,9 @@ export class BillingCompositionRoot {
       this.navigationMessage.set('No se pudo completar la navegación.');
       this.context.reportFailure({ code: 'PORTAL_TASK_FAILED' });
     } finally {
-      if (!this.isInactive() && generation === this.navigationGeneration) this.pendingInvoice = undefined;
+      if (!this.isInactive() && generation === this.navigationGeneration) {
+        this.pendingInvoice = undefined;
+      }
     }
   }
 
