@@ -6,6 +6,11 @@ import {
 } from '../data/invoice-detail-read-state';
 import { formatCopMoney } from '../presentation/format-cop-money';
 
+export interface InvoiceIssuanceIntent {
+  readonly invoiceId: string;
+  readonly expectedVersion: number;
+}
+
 @Component({
   selector: 'dlc-invoice-detail-http-page',
   standalone: true,
@@ -36,6 +41,16 @@ import { formatCopMoney } from '../presentation/format-cop-money';
             Los conceptos de los cargos no se muestran porque
             su estructura aún no está validada.
           </p>
+
+          @if (canIssueInvoices && invoice.status === 'DRAFT') {
+            <button
+              type="button"
+              [disabled]="!canIssue"
+              (click)="requestIssuance()"
+            >
+              {{ issuing ? 'Emitiendo factura...' : 'Emitir factura' }}
+            </button>
+          }
         </article>
       } @else {
         <p role="status">{{ statusMessage }}</p>
@@ -45,13 +60,38 @@ import { formatCopMoney } from '../presentation/format-cop-money';
 })
 export class InvoiceDetailHttpPageComponent {
   @Input() readState: InvoiceDetailReadState = createInvoiceDetailReadState();
+  @Input() canIssueInvoices = false;
+  @Input() issuing = false;
 
   @Output() readonly back = new EventEmitter<void>();
+  @Output() readonly issue = new EventEmitter<InvoiceIssuanceIntent>();
 
   get selectedInvoice(): ReadInvoice | undefined {
     return this.readState.status === 'success'
       ? this.readState.invoice
       : undefined;
+  }
+
+  get canIssue(): boolean {
+    return this.canIssueInvoices
+      && !this.issuing
+      && this.selectedInvoice?.status === 'DRAFT';
+  }
+
+  requestIssuance(): void {
+    if (!this.canIssue) {
+      return;
+    }
+
+    const invoice = this.selectedInvoice;
+    if (!invoice) {
+      return;
+    }
+
+    this.issue.emit({
+      invoiceId: invoice.id,
+      expectedVersion: invoice.version,
+    });
   }
 
   get displayNumber(): string {
