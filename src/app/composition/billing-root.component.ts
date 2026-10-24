@@ -43,6 +43,9 @@ export const BILLING_CONTEXT = new InjectionToken<PortalContext>('billing.contex
         [issuing]="issuingInvoice()"
         (issue)="requestInvoiceIssuance($event)"
         (back)="backToList()" />
+      @if (issuanceMessage()) {
+        <p role="alert">{{ issuanceMessage() }}</p>
+      }
     } @else {
       <dlc-invoice-detail-page [invoice]="selectedInvoice()" [canPay]="canRecordPayments()"
         (pay)="openPayment($event)" (back)="backToList()" />
@@ -71,6 +74,7 @@ export class BillingCompositionRoot {
   readonly invoiceDetailReadState = signal(createInvoiceDetailReadState());
   readonly invoiceListMode = signal<'demo' | 'http'>('demo');
   readonly issuingInvoice = signal(false);
+  readonly issuanceMessage = signal('');
 
   readonly displayedInvoices = computed(() =>
     this.invoiceListMode() === 'http'
@@ -132,7 +136,9 @@ export class BillingCompositionRoot {
   }
 
   readonly canRecordPayments = computed(() => this.session()?.state === 'authenticated'
-    && this.session()?.user?.roles.some(role => ['ADMINISTRATOR', 'SECRETARY_ASSISTANT'].includes(role)) === true);
+    && this.session()?.user?.roles.some(role =>
+      ['ADMINISTRATOR', 'SECRETARY_ASSISTANT'].includes(role)
+    ) === true);
 
   readonly isInvoiceList = computed(() => this.route().localPath === '/');
   readonly isProcedures = computed(() => this.route().localPath === '/procedures');
@@ -198,10 +204,11 @@ export class BillingCompositionRoot {
       return;
     }
 
-    const invoice = this.displayedInvoiceDetailReadState().invoice;
+    const readState = this.displayedInvoiceDetailReadState();
+    const invoice = readState.invoice;
 
     if (
-      this.displayedInvoiceDetailReadState().status !== 'success'
+      readState.status !== 'success'
       || !invoice
       || invoice.status !== 'DRAFT'
       || invoice.id !== request.invoiceId
@@ -211,6 +218,7 @@ export class BillingCompositionRoot {
       return;
     }
 
+    this.issuanceMessage.set('');
     this.issuingInvoice.set(true);
 
     try {
@@ -225,6 +233,9 @@ export class BillingCompositionRoot {
       }
     } catch {
       if (!this.isInactive()) {
+        this.issuanceMessage.set(
+          'No se pudo emitir la factura. Verifique su estado e inténtelo nuevamente.',
+        );
         this.context.reportFailure({ code: 'PORTAL_TASK_FAILED' });
       }
     } finally {
