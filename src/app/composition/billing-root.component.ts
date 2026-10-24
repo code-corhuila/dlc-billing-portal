@@ -4,6 +4,8 @@ import { BillingListPageComponent } from '../billing/pages/billing-list-page.com
 import { INVOICE_LIST_SOURCE } from '../billing/data/invoice-list-source';
 import { loadInvoiceReadState } from '../billing/data/invoice-read-flow';
 import { createInvoiceReadState } from '../billing/data/invoice-read-state';
+import { loadInvoiceDetailReadState } from '../billing/data/invoice-detail-read-flow';
+import { createInvoiceDetailReadState } from '../billing/data/invoice-detail-read-state';
 import { InvoiceDetailPageComponent } from '../billing/pages/invoice-detail-page.component';
 import { PricingCatalogComponent } from '../billing/catalog/pages/pricing-catalog/pricing-catalog.component';
 import { DemoInvoicePayments } from '../billing/data/demo-invoice-payments';
@@ -37,11 +39,13 @@ export class BillingCompositionRoot {
   private readonly destroyRef = inject(DestroyRef);
   private navigationGeneration = 0;
   private invoiceRequestGeneration = 0;
+  private invoiceDetailRequestGeneration = 0;
   private pendingInvoice?: string;
   private readonly source = inject(INVOICE_LIST_SOURCE);
 
   readonly session = signal(this.context.session.getSnapshot());
   readonly invoiceReadState = signal(createInvoiceReadState());
+  readonly invoiceDetailReadState = signal(createInvoiceDetailReadState());
   readonly invoiceListMode = signal<'demo' | 'http'>('demo');
 
   readonly displayedInvoices = computed(() =>
@@ -81,6 +85,23 @@ export class BillingCompositionRoot {
       state => {
         if (!this.isInactive() && generation === this.invoiceRequestGeneration) {
           this.invoiceReadState.set(state);
+        }
+      },
+    );
+  }
+
+  async loadInvoiceDetail(invoiceId: string): Promise<void> {
+    if (this.isInactive()) return;
+
+    const generation = ++this.invoiceDetailRequestGeneration;
+
+    await loadInvoiceDetailReadState(
+      this.context,
+      invoiceId,
+      this.invoiceDetailReadState(),
+      state => {
+        if (!this.isInactive() && generation === this.invoiceDetailRequestGeneration) {
+          this.invoiceDetailReadState.set(state);
         }
       },
     );
