@@ -5,9 +5,16 @@ import { INVOICE_LIST_SOURCE } from '../billing/data/invoice-list-source';
 import { loadInvoiceReadState } from '../billing/data/invoice-read-flow';
 import { createInvoiceReadState } from '../billing/data/invoice-read-state';
 import { loadInvoiceDetailReadState } from '../billing/data/invoice-detail-read-flow';
-import { createInvoiceDetailReadState } from '../billing/data/invoice-detail-read-state';
+import {
+  createInvoiceDetailReadState,
+  invoiceDetailReadSuccess,
+} from '../billing/data/invoice-detail-read-state';
+import { issueInvoiceHttp } from '../billing/data/invoice-issuance-http';
 import { InvoiceDetailPageComponent } from '../billing/pages/invoice-detail-page.component';
-import { InvoiceDetailHttpPageComponent } from '../billing/pages/invoice-detail-http-page.component';
+import {
+  InvoiceDetailHttpPageComponent,
+  type InvoiceIssuanceIntent,
+} from '../billing/pages/invoice-detail-http-page.component';
 import { PricingCatalogComponent } from '../billing/catalog/pages/pricing-catalog/pricing-catalog.component';
 import { DemoInvoicePayments } from '../billing/data/demo-invoice-payments';
 import { InvoicePaymentPageComponent } from '../billing/pages/invoice-payment-page.component';
@@ -30,7 +37,11 @@ export const BILLING_CONTEXT = new InjectionToken<PortalContext>('billing.contex
       (openInvoice)="openInvoice($event)" />
   } @else if (isInvoiceDetail()) {
     @if (useHttpInvoiceDetail()) {
-      <dlc-invoice-detail-http-page [readState]="displayedInvoiceDetailReadState()"
+      <dlc-invoice-detail-http-page
+        [readState]="displayedInvoiceDetailReadState()"
+        [canIssueInvoices]="canIssueInvoices()"
+        [issuing]="issuingInvoice()"
+        (issue)="requestInvoiceIssuance($event)"
         (back)="backToList()" />
     } @else {
       <dlc-invoice-detail-page [invoice]="selectedInvoice()" [canPay]="canRecordPayments()"
@@ -59,6 +70,7 @@ export class BillingCompositionRoot {
   readonly invoiceReadState = signal(createInvoiceReadState());
   readonly invoiceDetailReadState = signal(createInvoiceDetailReadState());
   readonly invoiceListMode = signal<'demo' | 'http'>('demo');
+  readonly issuingInvoice = signal(false);
 
   readonly displayedInvoices = computed(() =>
     this.invoiceListMode() === 'http'
@@ -121,6 +133,7 @@ export class BillingCompositionRoot {
 
   readonly canRecordPayments = computed(() => this.session()?.state === 'authenticated'
     && this.session()?.user?.roles.some(role => ['ADMINISTRATOR', 'SECRETARY_ASSISTANT'].includes(role)) === true);
+
   readonly isInvoiceList = computed(() => this.route().localPath === '/');
   readonly isProcedures = computed(() => this.route().localPath === '/procedures');
   readonly catalog = viewChild(PricingCatalogComponent);
@@ -146,6 +159,14 @@ export class BillingCompositionRoot {
   readonly useHttpInvoiceDetail = computed(() =>
     this.isInvoiceDetail() && this.invoiceListMode() === 'http');
 
+  readonly canIssueInvoices = computed(() =>
+    this.useHttpInvoiceDetail()
+    && this.session()?.state === 'authenticated'
+    && this.session()?.user?.roles.some(role =>
+      ['ADMINISTRATOR', 'SECRETARY_ASSISTANT'].includes(role)
+    ) === true
+  );
+
   readonly displayedInvoiceDetailReadState = computed(() => {
     if (!this.useHttpInvoiceDetail()) {
       return createInvoiceDetailReadState();
@@ -165,6 +186,64 @@ export class BillingCompositionRoot {
     const id = this.invoiceId();
     return id === undefined ? undefined : this.payments.detail(id);
   });
+
+  async issueInvoice(request: InvoiceIssuanceIntent & {
+    readonly idempotencyKey: string;
+  }): Promise<void> {
+    if (
+      this.isInactive()
+      || this.issuingInvoice()
+      || !this.canIssueInvoices()
+    ) {
+      return;
+    }
+
+    const invoice = this.displayedInvoiceDetailReadState().invoice;
+
+    if (
+      this.displayedInvoiceDetailReadState().status !== 'success'
+      || !invoice
+      || invoice.status !== 'DRAFT'
+      || invoice.id !== request.invoiceId
+      || invoice.id !== this.invoiceId()
+      || invoice.version !== request.expectedVersion
+    ) {
+      return;
+    }
+
+    this.issuingInvoice.set(true);
+
+    try {
+      const issued = await issueInvoiceHttp(this.context, request);
+
+      if (
+        !this.isInactive()
+        && this.useHttpInvoiceDetail()
+        && this.invoiceId() === issued.id
+      ) {
+        this.invoiceDetailReadState.set(invoiceDetailReadSuccess(issued));
+      }
+    } catch {
+      if (!this.isInactive()) {
+        this.context.reportFailure({ code: 'PORTAL_TASK_FAILED' });
+      }
+    } finally {
+      if (!this.isInactive()) {
+        this.issuingInvoice.set(false);
+      }
+    }
+  }
+
+  requestInvoiceIssuance(intent: InvoiceIssuanceIntent): void {
+    if (!this.canIssueInvoices() || this.issuingInvoice()) {
+      return;
+    }
+
+    void this.issueInvoice({
+      ...intent,
+      idempotencyKey: crypto.randomUUID(),
+    });
+  }
 
   readonly navigationMessage = signal('');
   readonly title = computed(() => this.route().localPath === '/'
@@ -192,6 +271,7 @@ export class BillingCompositionRoot {
     this.pendingInvoice = path;
     const generation = ++this.navigationGeneration;
     this.navigationMessage.set('');
+
     try {
       const result = await this.context.navigation.request({ path });
       if (!this.isInactive() && generation === this.navigationGeneration && result.status !== 'applied') {
