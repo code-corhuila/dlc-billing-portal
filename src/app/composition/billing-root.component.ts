@@ -7,6 +7,7 @@ import { createInvoiceReadState } from '../billing/data/invoice-read-state';
 import { loadInvoiceDetailReadState } from '../billing/data/invoice-detail-read-flow';
 import { createInvoiceDetailReadState } from '../billing/data/invoice-detail-read-state';
 import { InvoiceDetailPageComponent } from '../billing/pages/invoice-detail-page.component';
+import { InvoiceDetailHttpPageComponent } from '../billing/pages/invoice-detail-http-page.component';
 import { PricingCatalogComponent } from '../billing/catalog/pages/pricing-catalog/pricing-catalog.component';
 import { DemoInvoicePayments } from '../billing/data/demo-invoice-payments';
 import { InvoicePaymentPageComponent } from '../billing/pages/invoice-payment-page.component';
@@ -16,14 +17,25 @@ export const BILLING_CONTEXT = new InjectionToken<PortalContext>('billing.contex
 @Component({
   selector: 'dlc-billing-root',
   standalone: true,
-  imports: [BillingListPageComponent, InvoiceDetailPageComponent, PricingCatalogComponent, InvoicePaymentPageComponent],
+  imports: [
+    BillingListPageComponent,
+    InvoiceDetailPageComponent,
+    InvoiceDetailHttpPageComponent,
+    PricingCatalogComponent,
+    InvoicePaymentPageComponent,
+  ],
   template: `@if (isInvoiceList()) {
     <dlc-billing-list-page [composed]="true" [readOnly]="invoiceListMode() === 'http'"
       [readStatus]="displayedReadStatus()" [invoices]="displayedInvoices()"
       (openInvoice)="openInvoice($event)" />
   } @else if (isInvoiceDetail()) {
-    <dlc-invoice-detail-page [invoice]="selectedInvoice()" [canPay]="canRecordPayments()"
-      (pay)="openPayment($event)" (back)="backToList()" />
+    @if (useHttpInvoiceDetail()) {
+      <dlc-invoice-detail-http-page [readState]="invoiceDetailReadState()"
+        (back)="backToList()" />
+    } @else {
+      <dlc-invoice-detail-page [invoice]="selectedInvoice()" [canPay]="canRecordPayments()"
+        (pay)="openPayment($event)" (back)="backToList()" />
+    }
   } @else if (isPaymentRoute()) {
     <dlc-invoice-payment-page [session]="payments" [invoiceId]="selectedInvoice()?.id ?? ''"
       [canPay]="canRecordPayments()" (back)="backToList()" />
@@ -127,6 +139,8 @@ export class BillingCompositionRoot {
 
   readonly isPaymentRoute = computed(() => this.invoiceId() !== undefined && this.route().localPath.endsWith('/payment'));
   readonly isInvoiceDetail = computed(() => this.invoiceId() !== undefined && !this.isPaymentRoute());
+  readonly useHttpInvoiceDetail = computed(() => this.isInvoiceDetail() && this.invoiceListMode() === 'http');
+
   readonly selectedInvoice = computed(() => {
     const id = this.invoiceId();
     return id === undefined ? undefined : this.payments.detail(id);

@@ -5,6 +5,8 @@ import { BILLING_CONTEXT, BillingCompositionRoot } from './billing-root.componen
 import { provideInvoiceListSource } from '../billing/data/invoice-list-source';
 import { dummyInvoiceList } from '../billing/data/invoice-list.dummy';
 import { InvoicePaymentPageComponent } from '../billing/pages/invoice-payment-page.component';
+import { invoiceDetailReadSuccess } from '../billing/data/invoice-detail-read-state';
+import { readInvoiceDetail } from '../billing/data/invoice-read-adapter';
 
 function setup(localPath = '/invoices/invoice-002') {
   const controller = new AbortController();
@@ -198,4 +200,49 @@ it('does not publish invoice detail after disposal', async () => {
   await pending;
 
   expect(stateWrites).not.toHaveBeenCalled();
+});
+
+it('uses the demo invoice presentation by default', () => {
+  const { frame, injector, request } = setup();
+  try {
+    expect(frame.invoiceListMode()).toBe('demo');
+    expect(frame.useHttpInvoiceDetail()).toBe(false);
+    expect(frame.selectedInvoice()?.number).toBe('INV-002');
+    expect(request).not.toHaveBeenCalled();
+  } finally { injector.destroy(); }
+});
+
+it('selects HTTP detail presentation using the existing invoice mode', () => {
+  const { frame, injector, request } = setup();
+  try {
+    frame.invoiceListMode.set('http');
+
+    expect(frame.useHttpInvoiceDetail()).toBe(true);
+    expect(frame.invoiceDetailReadState().status).toBe('idle');
+    expect(request).not.toHaveBeenCalled();
+  } finally { injector.destroy(); }
+});
+
+it('exposes the validated HTTP detail state independently of demo data', () => {
+  const { frame, injector } = setup();
+  try {
+    const invoice = readInvoiceDetail(apiInvoice);
+    frame.invoiceDetailReadState.set(invoiceDetailReadSuccess(invoice));
+    frame.invoiceListMode.set('http');
+
+    expect(frame.useHttpInvoiceDetail()).toBe(true);
+    expect(frame.invoiceDetailReadState().invoice?.id).toBe(apiInvoice.id);
+    expect(frame.selectedInvoice()?.number).toBe('INV-002');
+  } finally { injector.destroy(); }
+});
+
+it('does not use the HTTP detail presentation for payment or list routes', () => {
+  const { frame, injector } = setup('/invoices/invoice-001/payment');
+  try {
+    frame.invoiceListMode.set('http');
+    expect(frame.useHttpInvoiceDetail()).toBe(false);
+
+    frame.route.set({ ...frame.route(), localPath: '/' });
+    expect(frame.useHttpInvoiceDetail()).toBe(false);
+  } finally { injector.destroy(); }
 });
