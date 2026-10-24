@@ -10,13 +10,22 @@ function setup(localPath = '/invoices/invoice-002') {
   const controller = new AbortController();
   const route = { localPath, basePath: '/app/billing' };
   const navigation = { request: vi.fn().mockResolvedValue({ status: 'applied' }) };
+  const request = vi.fn();
   const source = { read: dummyInvoiceList.read, detail: vi.fn(dummyInvoiceList.detail) };
-  const context = { route, navigation, signal: controller.signal, reportFailure: vi.fn(),
-    session: { getSnapshot: vi.fn(), subscribe: () => () => {} } };
-  const injector = Injector.create({ providers: [provideInvoiceListSource(source),
-    { provide: BILLING_CONTEXT, useValue: context }] });
+  const context = {
+    route,
+    navigation,
+    http: { request },
+    signal: controller.signal,
+    reportFailure: vi.fn(),
+    session: { getSnapshot: vi.fn(), subscribe: () => () => {} },
+  };
+  const injector = Injector.create({ providers: [
+    provideInvoiceListSource(source),
+    { provide: BILLING_CONTEXT, useValue: context },
+  ] });
   const frame = runInInjectionContext(injector, () => new BillingCompositionRoot());
-  return { frame, injector, source, context, controller };
+  return { frame, injector, source, context, controller, request };
 }
 
 it('selects details through the configured source and reacts to compositor route updates', () => {
@@ -84,4 +93,109 @@ it('requests list navigation through the compositor and ignores late refusal aft
   expect(writes).not.toHaveBeenCalled();
   await frame.backToList();
   expect(context.navigation.request).toHaveBeenCalledTimes(1);
+});
+
+const apiInvoice = {
+  id: '11111111-1111-4111-8111-111111111111',
+  patientId: '22222222-2222-4222-8222-222222222222',
+  items: [],
+  total: '150000.00',
+  balance: '75000.00',
+  currency: 'COP',
+  status: 'PARTIALLY_PAID',
+  version: 3,
+};
+
+it('loads invoice detail explicitly without changing demo selection', async () => {
+  const { frame, injector, request, context } = setup();
+  try {
+    request.mockResolvedValue({ ok: true, data: apiInvoice });
+
+    expect(frame.invoiceDetailReadState()).toEqual({
+      status: 'idle',
+      invoice: undefined,
+    });
+
+    await frame.loadInvoiceDetail(apiInvoice.id);
+
+    expect(request).toHaveBeenCalledExactlyOnceWith({
+      method: 'GET',
+      path: `/api/v1/invoices/${apiInvoice.id}`,
+      signal: context.signal,
+    });
+    expect(frame.invoiceDetailReadState().status).toBe('success');
+    expect(frame.invoiceDetailReadState().invoice).toMatchObject({
+      id: apiInvoice.id,
+      version: 3,
+      total: '150000.00',
+      balance: '75000.00',
+    });
+    expect(frame.selectedInvoice()?.number).toBe('INV-002');
+  } finally { injector.destroy(); }
+});
+
+it('publishes loading before the invoice detail request finishes', async () => {
+  const { frame, injector, request } = setup();
+  try {
+    let resolveRequest!: (value: unknown) => void;
+    request.mockReturnValue(new Promise(resolve => {
+      resolveRequest = resolve;
+    }));
+
+    const pending = frame.loadInvoiceDetail(apiInvoice.id);
+
+    expect(frame.invoiceDetailReadState()).toEqual({
+      status: 'loading',
+      invoice: undefined,
+    });
+
+    resolveRequest({ ok: true, data: apiInvoice });
+    await pending;
+
+    expect(frame.invoiceDetailReadState().status).toBe('success');
+  } finally { injector.destroy(); }
+});
+
+it('ignores stale invoice detail responses', async () => {
+  const { frame, injector, request } = setup();
+  try {
+    const pendingRequests: Array<(value: unknown) => void> = [];
+    request.mockImplementation(() => new Promise(resolve => {
+      pendingRequests.push(resolve);
+    }));
+
+    const first = frame.loadInvoiceDetail(apiInvoice.id);
+    const newerId = '33333333-3333-4333-8333-333333333333';
+    const second = frame.loadInvoiceDetail(newerId);
+
+    pendingRequests[1]({
+      ok: true,
+      data: { ...apiInvoice, id: newerId, version: 4 },
+    });
+    await second;
+
+    pendingRequests[0]({ ok: true, data: apiInvoice });
+    await first;
+
+    expect(frame.invoiceDetailReadState().invoice?.id).toBe(newerId);
+    expect(frame.invoiceDetailReadState().invoice?.version).toBe(4);
+  } finally { injector.destroy(); }
+});
+
+it('does not publish invoice detail after disposal', async () => {
+  const { frame, injector, request } = setup();
+  let resolveRequest!: (value: unknown) => void;
+  request.mockReturnValue(new Promise(resolve => {
+    resolveRequest = resolve;
+  }));
+
+  const pending = frame.loadInvoiceDetail(apiInvoice.id);
+  const stateWrites = vi.spyOn(frame.invoiceDetailReadState, 'set');
+
+  injector.destroy();
+
+  resolveRequest({ ok: true, data: apiInvoice });
+  await pending;
+
+  expect(stateWrites).not.toHaveBeenCalled();
 });
