@@ -9,6 +9,32 @@ type IssueContext = Pick<PortalContext, 'http' | 'signal'>;
 const invoiceId = '123e4567-e89b-42d3-a456-426614174000';
 const idempotencyKey = '987e6543-e21b-42d3-a456-426614174999';
 
+function createInvoice(
+  overrides: Record<string, unknown> = {},
+): Record<string, unknown> {
+  return {
+    id: invoiceId,
+    patientId: '123e4567-e89b-42d3-a456-426614174001',
+    items: [],
+    total: '130000.00',
+    balance: '130000.00',
+    currency: 'COP',
+    status: 'ISSUED',
+    version: 2,
+    ...overrides,
+  };
+}
+
+function successfulResponse(data: unknown) {
+  return {
+    ok: true as const,
+    status: 200,
+    data,
+    headers: {},
+    correlationId: 'test-correlation',
+  };
+}
+
 function createContext(
   request: PortalContext['http']['request'],
   signal: AbortSignal = new AbortController().signal,
@@ -21,19 +47,12 @@ function createContext(
 
 describe('issueInvoiceHttp', () => {
   it('uses the shared HTTP client with the approved issuance contract', async () => {
-    const invoice = { id: invoiceId, status: 'ISSUED', version: 2 };
-
-    const request = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      data: invoice,
-      headers: {},
-      correlationId: 'test-correlation',
-    });
-
+    const request = vi.fn().mockResolvedValue(
+      successfulResponse(createInvoice()),
+    );
     const context = createContext(request);
 
-    await issueInvoiceHttp(context, {
+    const result = await issueInvoiceHttp(context, {
       invoiceId,
       expectedVersion: 1,
       idempotencyKey,
@@ -46,16 +65,16 @@ describe('issueInvoiceHttp', () => {
       headers: { 'Idempotency-Key': idempotencyKey },
       signal: context.signal,
     });
+
+    expect(result.status).toBe('ISSUED');
+    expect(result.version).toBe(2);
+    expect(result.total).toBe('130000.00');
   });
 
   it('encodes the invoice identifier as one path segment', async () => {
-    const request = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      data: {},
-      headers: {},
-      correlationId: 'test-correlation',
-    });
+    const request = vi.fn().mockResolvedValue(
+      successfulResponse(createInvoice()),
+    );
 
     await issueInvoiceHttp(createContext(request), {
       invoiceId: 'invoice/with spaces',
@@ -109,6 +128,20 @@ describe('issueInvoiceHttp', () => {
     expect(request).toHaveBeenCalledOnce();
   });
 
+  it('rejects an invalid idempotency key before sending a request', async () => {
+    const request = vi.fn();
+
+    await expect(
+      issueInvoiceHttp(createContext(request), {
+        invoiceId,
+        expectedVersion: 1,
+        idempotencyKey: 'not-a-uuid',
+      }),
+    ).rejects.toThrow();
+
+    expect(request).not.toHaveBeenCalled();
+  });
+
   it('does not send an issuance request when already cancelled', async () => {
     const controller = new AbortController();
     controller.abort();
@@ -131,13 +164,7 @@ describe('issueInvoiceHttp', () => {
 
     const request = vi.fn().mockImplementation(async () => {
       controller.abort();
-      return {
-        ok: true,
-        status: 200,
-        data: { id: invoiceId, status: 'ISSUED', version: 2 },
-        headers: {},
-        correlationId: 'test-correlation',
-      };
+      return successfulResponse(createInvoice());
     });
 
     await expect(
@@ -147,5 +174,33 @@ describe('issueInvoiceHttp', () => {
         idempotencyKey,
       }),
     ).rejects.toThrow();
+  });
+
+  it('rejects a response that does not contain a valid invoice', async () => {
+    const request = vi.fn().mockResolvedValue(
+      successfulResponse({ status: 'ISSUED' }),
+    );
+
+    await expect(
+      issueInvoiceHttp(createContext(request), {
+        invoiceId,
+        expectedVersion: 1,
+        idempotencyKey,
+      }),
+    ).rejects.toThrow();
+  });
+
+  it('does not accept a DRAFT invoice as successful issuance', async () => {
+    const request = vi.fn().mockResolvedValue(
+      successfulResponse(createInvoice({ status: 'DRAFT' })),
+    );
+
+    await expect(
+      issueInvoiceHttp(createContext(request), {
+        invoiceId,
+        expectedVersion: 1,
+        idempotencyKey,
+      }),
+    ).rejects.toThrow('Invoice was not issued');
   });
 });
