@@ -101,4 +101,3 @@ it('provides a back event without payment or issuance actions', () => {
   expect('pay' in page).toBe(false);
   expect('issue' in page).toBe(false);
 });
-
