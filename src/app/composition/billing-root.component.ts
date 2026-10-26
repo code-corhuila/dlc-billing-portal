@@ -221,27 +221,45 @@ export class BillingCompositionRoot {
       return;
     }
 
+    const initialRoute = this.route().localPath;
+    const initialReadState = this.invoiceDetailReadState();
+
+    const isCurrent = () =>
+      !this.isInactive()
+      && this.canIssueInvoices()
+      && this.route().localPath === initialRoute
+      && this.invoiceId() === request.invoiceId;
+
     this.issuanceMessage.set('');
     this.issuingInvoice.set(true);
 
     try {
       const issued = await issueInvoiceHttp(this.context, request);
 
-      if (
-        this.issuanceAttempt?.idempotencyKey === request.idempotencyKey
-      ) {
+      if (this.issuanceAttempt?.idempotencyKey === request.idempotencyKey) {
         this.issuanceAttempt = undefined;
       }
 
+      const currentInvoice = this.invoiceDetailReadState().invoice;
+
       if (
-        !this.isInactive()
-        && this.useHttpInvoiceDetail()
-        && this.invoiceId() === issued.id
+        isCurrent()
+        && issued.id === request.invoiceId
+        && (
+          this.invoiceDetailReadState() === initialReadState
+          || (
+            currentInvoice?.id === issued.id
+            && currentInvoice.version <= issued.version
+          )
+        )
       ) {
         this.invoiceDetailReadState.set(invoiceDetailReadSuccess(issued));
       }
     } catch {
-      if (!this.isInactive()) {
+      if (
+        isCurrent()
+        && this.invoiceDetailReadState() === initialReadState
+      ) {
         this.issuanceMessage.set(
           'No se pudo emitir la factura. Verifique su estado e inténtelo nuevamente.',
         );
