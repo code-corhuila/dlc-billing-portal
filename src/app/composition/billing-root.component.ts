@@ -9,7 +9,10 @@ import {
   createInvoiceDetailReadState,
   invoiceDetailReadSuccess,
 } from '../billing/data/invoice-detail-read-state';
-import { issueInvoiceHttp } from '../billing/data/invoice-issuance-http';
+import {
+  InvoiceIssuanceHttpError,
+  issueInvoiceHttp,
+} from '../billing/data/invoice-issuance-http';
 import { InvoiceDetailPageComponent } from '../billing/pages/invoice-detail-page.component';
 import {
   InvoiceDetailHttpPageComponent,
@@ -255,14 +258,24 @@ export class BillingCompositionRoot {
       ) {
         this.invoiceDetailReadState.set(invoiceDetailReadSuccess(issued));
       }
-    } catch {
+    } catch (error: unknown) {
       if (
         isCurrent()
         && this.invoiceDetailReadState() === initialReadState
       ) {
-        this.issuanceMessage.set(
-          'No se pudo emitir la factura. Verifique su estado e inténtelo nuevamente.',
-        );
+        const status = error instanceof InvoiceIssuanceHttpError
+          ? error.status
+          : undefined;
+
+        const message = status === 409
+          ? 'No se pudo emitir la factura. Existe un conflicto de versión. Actualice y revise la factura.'
+          : status === 403
+            ? 'No se pudo emitir la factura. No tiene permisos para realizar esta operación.'
+            : status === 503
+              ? 'No se pudo emitir la factura. El servicio no está disponible temporalmente.'
+              : 'No se pudo emitir la factura. Verifique su estado e inténtelo nuevamente.';
+
+        this.issuanceMessage.set(message);
         this.context.reportFailure({ code: 'PORTAL_TASK_FAILED' });
       }
     } finally {
