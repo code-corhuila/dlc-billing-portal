@@ -67,6 +67,9 @@ export class BillingCompositionRoot {
   private invoiceRequestGeneration = 0;
   private invoiceDetailRequestGeneration = 0;
   private pendingInvoice?: string;
+  private issuanceAttempt?: InvoiceIssuanceIntent & {
+    readonly idempotencyKey: string;
+  };
   private readonly source = inject(INVOICE_LIST_SOURCE);
 
   readonly session = signal(this.context.session.getSnapshot());
@@ -225,6 +228,12 @@ export class BillingCompositionRoot {
       const issued = await issueInvoiceHttp(this.context, request);
 
       if (
+        this.issuanceAttempt?.idempotencyKey === request.idempotencyKey
+      ) {
+        this.issuanceAttempt = undefined;
+      }
+
+      if (
         !this.isInactive()
         && this.useHttpInvoiceDetail()
         && this.invoiceId() === issued.id
@@ -250,10 +259,21 @@ export class BillingCompositionRoot {
       return;
     }
 
-    void this.issueInvoice({
+    const previous = this.issuanceAttempt;
+
+    const idempotencyKey =
+      previous?.invoiceId === intent.invoiceId
+      && previous.expectedVersion === intent.expectedVersion
+        ? previous.idempotencyKey
+        : crypto.randomUUID();
+
+    const request = {
       ...intent,
-      idempotencyKey: crypto.randomUUID(),
-    });
+      idempotencyKey,
+    };
+
+    this.issuanceAttempt = request;
+    void this.issueInvoice(request);
   }
 
   readonly navigationMessage = signal('');
