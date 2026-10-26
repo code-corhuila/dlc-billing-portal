@@ -1,8 +1,5 @@
 import type { PortalContext } from '../../shell-contract';
-import {
-  readInvoiceDetail,
-  type ReadInvoice,
-} from './invoice-read-adapter';
+import { readInvoiceDetail, type ReadInvoice } from './invoice-read-adapter';
 
 type IssueContext = Pick<PortalContext, 'http' | 'signal'>;
 
@@ -10,6 +7,13 @@ export interface IssueInvoiceRequest {
   readonly invoiceId: string;
   readonly expectedVersion: number;
   readonly idempotencyKey: string;
+}
+
+export class InvoiceIssuanceHttpError extends Error {
+  constructor(readonly status: number) {
+    super('Invoice issuance failed');
+    this.name = 'InvoiceIssuanceHttpError';
+  }
 }
 
 export async function issueInvoiceHttp(
@@ -21,8 +25,8 @@ export async function issueInvoiceHttp(
   }
 
   if (
-    !Number.isSafeInteger(request.expectedVersion) ||
-    request.expectedVersion < 1
+    !Number.isSafeInteger(request.expectedVersion)
+    || request.expectedVersion < 1
   ) {
     throw new Error('Invalid expected invoice version');
   }
@@ -51,7 +55,7 @@ export async function issueInvoiceHttp(
   }
 
   if (!result.ok) {
-    throw new Error('Invoice issuance failed');
+    throw new InvoiceIssuanceHttpError(result.status);
   }
 
   const invoice = readInvoiceDetail(result.data);
