@@ -122,6 +122,8 @@ it('does not allow PDF downloads in demo mode', () => {
 
 it('requests the PDF using the documented HTTP contract', async () => {
   const { frame, injector, request, context } = setup();
+  const deliver = vi.spyOn(pdfBrowser, 'deliverInvoicePdf')
+    .mockImplementation(() => {});
 
   try {
     authorize(frame);
@@ -136,6 +138,7 @@ it('requests the PDF using the documented HTTP contract', async () => {
       signal: context.signal,
     });
 
+    expect(deliver).toHaveBeenCalledOnce();
     expect(frame.downloadingPdf()).toBe(false);
     expect(frame.pdfDownloadMessage()).toBe('');
   } finally {
