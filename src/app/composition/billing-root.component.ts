@@ -17,6 +17,7 @@ import {
   downloadInvoicePdfHttp,
   InvoicePdfHttpError,
 } from '../billing/data/invoice-pdf-http';
+import { deliverInvoicePdf } from '../billing/data/invoice-pdf-browser-download';
 import { InvoiceDetailPageComponent } from '../billing/pages/invoice-detail-page.component';
 import {
   InvoiceDetailHttpPageComponent,
@@ -255,9 +256,11 @@ export class BillingCompositionRoot {
     this.downloadingPdf.set(true);
 
     try {
-      await downloadInvoicePdfHttp(this.context, invoiceId);
+      const pdf = await downloadInvoicePdfHttp(this.context, invoiceId);
 
-      // Browser file delivery is handled in a separate, tested increment.
+      if (isCurrent()) {
+        deliverInvoicePdf(pdf, invoiceId);
+      }
     } catch (error: unknown) {
       if (isCurrent()) {
         const status = error instanceof InvoicePdfHttpError
