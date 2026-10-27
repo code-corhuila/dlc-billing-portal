@@ -200,3 +200,92 @@ it('does not emit duplicate issuance intents while submitting', () => {
   expect(page.canIssue).toBe(false);
   expect(issue).not.toHaveBeenCalled();
 });
+
+it('does not allow PDF download by default', () => {
+  const page = setup(invoiceDetailReadSuccess({
+    ...invoice,
+    status: 'ISSUED',
+  }));
+
+  expect(page.canDownloadPdf).toBe(false);
+});
+
+it('allows an authorized PDF download for an issued invoice', () => {
+  const page = setup(invoiceDetailReadSuccess({
+    ...invoice,
+    status: 'ISSUED',
+  }));
+
+  page.canDownloadPdfInvoices = true;
+
+  expect(page.canDownloadPdf).toBe(true);
+});
+
+it('does not allow PDF download for a draft invoice', () => {
+  const page = setup(invoiceDetailReadSuccess({
+    ...invoice,
+    status: 'DRAFT',
+  }));
+
+  page.canDownloadPdfInvoices = true;
+
+  expect(page.canDownloadPdf).toBe(false);
+});
+
+it('does not allow PDF download without a successful invoice read', () => {
+  const page = setup();
+  page.canDownloadPdfInvoices = true;
+
+  expect(page.canDownloadPdf).toBe(false);
+});
+
+it('does not allow duplicate PDF downloads while downloading', () => {
+  const page = setup(invoiceDetailReadSuccess({
+    ...invoice,
+    status: 'ISSUED',
+  }));
+
+  page.canDownloadPdfInvoices = true;
+  page.downloadingPdf = true;
+
+  const download = vi.fn();
+  page.downloadPdf.subscribe(download);
+
+  page.requestPdfDownload();
+
+  expect(page.canDownloadPdf).toBe(false);
+  expect(download).not.toHaveBeenCalled();
+});
+
+it('emits the invoice identifier for an authorized PDF download', () => {
+  const issued = {
+    ...invoice,
+    status: 'ISSUED' as const,
+  };
+
+  const page = setup(invoiceDetailReadSuccess(issued));
+  page.canDownloadPdfInvoices = true;
+
+  const download = vi.fn();
+  page.downloadPdf.subscribe(download);
+
+  page.requestPdfDownload();
+
+  expect(download).toHaveBeenCalledExactlyOnceWith(issued.id);
+  expect(issued.status).toBe('ISSUED');
+  expect(issued.version).toBe(3);
+});
+
+it('does not emit a PDF download event when unauthorized', () => {
+  const page = setup(invoiceDetailReadSuccess({
+    ...invoice,
+    status: 'ISSUED',
+  }));
+
+  const download = vi.fn();
+  page.downloadPdf.subscribe(download);
+
+  page.requestPdfDownload();
+
+  expect(download).not.toHaveBeenCalled();
+});
