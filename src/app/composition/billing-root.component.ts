@@ -13,6 +13,10 @@ import {
   InvoiceIssuanceHttpError,
   issueInvoiceHttp,
 } from '../billing/data/invoice-issuance-http';
+import {
+  downloadInvoicePdfHttp,
+  InvoicePdfHttpError,
+} from '../billing/data/invoice-pdf-http';
 import { InvoiceDetailPageComponent } from '../billing/pages/invoice-detail-page.component';
 import {
   InvoiceDetailHttpPageComponent,
@@ -44,10 +48,16 @@ export const BILLING_CONTEXT = new InjectionToken<PortalContext>('billing.contex
         [readState]="displayedInvoiceDetailReadState()"
         [canIssueInvoices]="canIssueInvoices()"
         [issuing]="issuingInvoice()"
+        [canDownloadPdfInvoices]="canDownloadPdfInvoices()"
+        [downloadingPdf]="downloadingPdf()"
         (issue)="requestInvoiceIssuance($event)"
+        (downloadPdf)="requestInvoicePdfDownload($event)"
         (back)="backToList()" />
       @if (issuanceMessage()) {
         <p role="alert">{{ issuanceMessage() }}</p>
+      }
+      @if (pdfDownloadMessage()) {
+        <p role="alert">{{ pdfDownloadMessage() }}</p>
       }
     } @else {
       <dlc-invoice-detail-page [invoice]="selectedInvoice()" [canPay]="canRecordPayments()"
@@ -81,6 +91,8 @@ export class BillingCompositionRoot {
   readonly invoiceListMode = signal<'demo' | 'http'>('demo');
   readonly issuingInvoice = signal(false);
   readonly issuanceMessage = signal('');
+  readonly downloadingPdf = signal(false);
+  readonly pdfDownloadMessage = signal('');
 
   readonly displayedInvoices = computed(() =>
     this.invoiceListMode() === 'http'
@@ -179,6 +191,14 @@ export class BillingCompositionRoot {
     ) === true
   );
 
+  readonly canDownloadPdfInvoices = computed(() =>
+    this.useHttpInvoiceDetail()
+    && this.session()?.state === 'authenticated'
+    && this.session()?.user?.roles.some(role =>
+      ['ADMINISTRATOR', 'SECRETARY_ASSISTANT'].includes(role)
+    ) === true
+  );
+
   readonly displayedInvoiceDetailReadState = computed(() => {
     if (!this.useHttpInvoiceDetail()) {
       return createInvoiceDetailReadState();
@@ -198,6 +218,73 @@ export class BillingCompositionRoot {
     const id = this.invoiceId();
     return id === undefined ? undefined : this.payments.detail(id);
   });
+
+  async downloadInvoicePdf(invoiceId: string): Promise<void> {
+    if (
+      this.isInactive()
+      || this.downloadingPdf()
+      || !this.canDownloadPdfInvoices()
+    ) {
+      return;
+    }
+
+    const readState = this.displayedInvoiceDetailReadState();
+    const invoice = readState.invoice;
+
+    if (
+      readState.status !== 'success'
+      || !invoice
+      || invoice.status !== 'ISSUED'
+      || invoice.id !== invoiceId
+      || invoice.id !== this.invoiceId()
+    ) {
+      return;
+    }
+
+    const initialRoute = this.route().localPath;
+    const initialReadState = this.invoiceDetailReadState();
+
+    const isCurrent = () =>
+      !this.isInactive()
+      && this.canDownloadPdfInvoices()
+      && this.route().localPath === initialRoute
+      && this.invoiceId() === invoiceId
+      && this.invoiceDetailReadState() === initialReadState;
+
+    this.pdfDownloadMessage.set('');
+    this.downloadingPdf.set(true);
+
+    try {
+      await downloadInvoicePdfHttp(this.context, invoiceId);
+
+      // Browser file delivery is handled in a separate, tested increment.
+    } catch (error: unknown) {
+      if (isCurrent()) {
+        const status = error instanceof InvoicePdfHttpError
+          ? error.status
+          : undefined;
+
+        const message = status === 403
+          ? 'No tiene permisos para descargar esta factura.'
+          : status === 401
+            ? 'Su sesión no permite descargar esta factura.'
+            : status === 404
+              ? 'No se encontró el PDF de la factura.'
+              : 'No se pudo descargar el PDF de la factura. Inténtelo nuevamente.';
+
+        this.pdfDownloadMessage.set(message);
+        this.context.reportFailure({ code: 'PORTAL_TASK_FAILED' });
+      }
+    } finally {
+      if (!this.isInactive()) {
+        this.downloadingPdf.set(false);
+      }
+    }
+  }
+
+  requestInvoicePdfDownload(invoiceId: string): void {
+    void this.downloadInvoicePdf(invoiceId);
+  }
 
   async issueInvoice(request: InvoiceIssuanceIntent & {
     readonly idempotencyKey: string;
