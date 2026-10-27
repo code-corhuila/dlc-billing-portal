@@ -18,6 +18,11 @@ import {
   InvoicePdfHttpError,
 } from '../billing/data/invoice-pdf-http';
 import { deliverInvoicePdf } from '../billing/data/invoice-pdf-browser-download';
+import {
+  recordPaymentHttp,
+  PaymentRegistrationHttpError,
+  type RecordPaymentRequest,
+} from '../billing/data/payment-registration-http';
 import { InvoiceDetailPageComponent } from '../billing/pages/invoice-detail-page.component';
 import {
   InvoiceDetailHttpPageComponent,
@@ -94,6 +99,8 @@ export class BillingCompositionRoot {
   readonly issuanceMessage = signal('');
   readonly downloadingPdf = signal(false);
   readonly pdfDownloadMessage = signal('');
+  readonly recordingPayment = signal(false);
+  readonly paymentRegistrationMessage = signal('');
 
   readonly displayedInvoices = computed(() =>
     this.invoiceListMode() === 'http'
@@ -219,6 +226,73 @@ export class BillingCompositionRoot {
     const id = this.invoiceId();
     return id === undefined ? undefined : this.payments.detail(id);
   });
+
+  async registerPayment(request: RecordPaymentRequest): Promise<void> {
+    if (
+      this.isInactive()
+      || this.recordingPayment()
+      || !this.canRecordPayments()
+      || this.invoiceListMode() !== 'http'
+      || !this.isPaymentRoute()
+      || this.invoiceId() !== request.invoiceId
+    ) {
+      return;
+    }
+
+    const readState = this.invoiceDetailReadState();
+    const invoice = readState.invoice;
+
+    if (
+      readState.status !== 'success'
+      || !invoice
+      || invoice.id !== request.invoiceId
+      || invoice.version !== request.expectedVersion
+      || !['ISSUED', 'PARTIALLY_PAID'].includes(invoice.status)
+    ) {
+      return;
+    }
+
+    const initialRoute = this.route().localPath;
+    const isCurrent = () =>
+      !this.isInactive()
+      && this.canRecordPayments()
+      && this.route().localPath === initialRoute
+      && this.invoiceId() === request.invoiceId;
+
+    this.paymentRegistrationMessage.set('');
+    this.recordingPayment.set(true);
+
+    try {
+      await recordPaymentHttp(this.context, request);
+
+      if (isCurrent()) {
+        this.paymentRegistrationMessage.set(
+          'Pago registrado. Actualice el detalle de la factura para consultar el saldo.',
+        );
+      }
+    } catch (error: unknown) {
+      if (isCurrent()) {
+        const status = error instanceof PaymentRegistrationHttpError
+          ? error.status
+          : undefined;
+
+        const message = status === 409
+          ? 'No se pudo registrar el pago. Actualice la factura y revise su saldo.'
+          : status === 403
+            ? 'No tiene permisos para registrar este pago.'
+            : status === 503
+              ? 'El servicio de pagos no está disponible temporalmente.'
+              : 'No se pudo registrar el pago. Revise los datos e inténtelo nuevamente.';
+
+        this.paymentRegistrationMessage.set(message);
+        this.context.reportFailure({ code: 'PORTAL_TASK_FAILED' });
+      }
+    } finally {
+      if (!this.isInactive()) {
+        this.recordingPayment.set(false);
+      }
+    }
+  }
 
   async downloadInvoicePdf(invoiceId: string): Promise<void> {
     if (
