@@ -1,6 +1,6 @@
 import '@angular/compiler';
 import { Injector, runInInjectionContext } from '@angular/core';
-import { expect, it, vi } from 'vitest';
+import { afterEach, expect, it, vi } from 'vitest';
 
 import {
   BILLING_CONTEXT,
@@ -10,13 +10,16 @@ import { provideInvoiceListSource } from '../billing/data/invoice-list-source';
 import { dummyInvoiceList } from '../billing/data/invoice-list.dummy';
 import { invoiceDetailReadSuccess } from '../billing/data/invoice-detail-read-state';
 import { readInvoiceDetail } from '../billing/data/invoice-read-adapter';
+import * as pdfBrowser from '../billing/data/invoice-pdf-browser-download';
 
 const invoiceId = '11111111-1111-4111-8111-111111111111';
 const otherInvoiceId = '33333333-3333-4333-8333-333333333333';
 
-function setup(
-  status: 'DRAFT' | 'ISSUED' = 'ISSUED',
-) {
+afterEach(() => {
+  vi.restoreAllMocks();
+});
+
+function setup(status: 'DRAFT' | 'ISSUED' = 'ISSUED') {
   const controller = new AbortController();
   const request = vi.fn();
 
@@ -247,6 +250,84 @@ it('reports HTTP failures without exposing internal details', async () => {
       code: 'PORTAL_TASK_FAILED',
     });
     expect(frame.downloadingPdf()).toBe(false);
+  } finally {
+    injector.destroy();
+  }
+});
+
+it('delivers the downloaded PDF Blob to the browser', async () => {
+  const { frame, injector, request } = setup();
+  const deliver = vi.spyOn(pdfBrowser, 'deliverInvoicePdf')
+    .mockImplementation(() => {});
+
+  try {
+    authorize(frame);
+    const response = pdfResponse();
+    request.mockResolvedValue(response);
+
+    await frame.downloadInvoicePdf(invoiceId);
+
+    expect(deliver).toHaveBeenCalledExactlyOnceWith(
+      response.data,
+      invoiceId,
+    );
+  } finally {
+    injector.destroy();
+  }
+});
+
+it('does not deliver a stale PDF after navigating away', async () => {
+  const { frame, injector, request } = setup();
+  const deliver = vi.spyOn(pdfBrowser, 'deliverInvoicePdf')
+    .mockImplementation(() => {});
+
+  try {
+    authorize(frame);
+
+    let settle!: (value: unknown) => void;
+    request.mockReturnValue(new Promise(resolve => {
+      settle = resolve;
+    }));
+
+    const pending = frame.downloadInvoicePdf(invoiceId);
+
+    frame.route.set({
+      ...frame.route(),
+      localPath: `/invoices/${otherInvoiceId}`,
+    });
+
+    settle(pdfResponse());
+    await pending;
+
+    expect(deliver).not.toHaveBeenCalled();
+  } finally {
+    injector.destroy();
+  }
+});
+
+it('does not deliver the PDF after authorization is revoked', async () => {
+  const { frame, injector, request } = setup();
+  const deliver = vi.spyOn(pdfBrowser, 'deliverInvoicePdf')
+    .mockImplementation(() => {});
+
+  try {
+    authorize(frame);
+
+    let settle!: (value: unknown) => void;
+    request.mockReturnValue(new Promise(resolve => {
+      settle = resolve;
+    }));
+
+    const pending = frame.downloadInvoicePdf(invoiceId);
+
+    frame.session.set({
+      state: 'anonymous',
+    } as never);
+
+    settle(pdfResponse());
+    await pending;
+
+    expect(deliver).not.toHaveBeenCalled();
   } finally {
     injector.destroy();
   }
