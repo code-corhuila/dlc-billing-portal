@@ -30,6 +30,14 @@ const apiPayment = {
   version: 4,
 };
 
+const paymentIntent = {
+  invoiceId,
+  amount: '25000.00',
+  method: 'CASH' as const,
+  expectedVersion: 3,
+  idempotencyKey: '55555555-5555-4555-8555-555555555555',
+};
+
 function setup() {
   const controller = new AbortController();
   const request = vi.fn();
@@ -68,6 +76,7 @@ function setup() {
   root.invoiceDetailReadState.set(
     invoiceDetailReadSuccess(readInvoiceDetail(apiInvoice)),
   );
+
   root.session.set({
     state: 'authenticated',
     user: { roles: ['SECRETARY_ASSISTANT'] },
@@ -80,23 +89,29 @@ it('registers a payment through the shared HTTP client using the actual invoice 
   const { root, injector, request, context } = setup();
 
   try {
-    request.mockResolvedValue({
-      ok: true,
-      status: 201,
-      data: apiPayment,
-    });
-
     const before = root.payments.read();
 
-    await root.registerPayment({
-      invoiceId,
-      amount: '25000.00',
-      method: 'CASH',
-      expectedVersion: 3,
-      idempotencyKey: '55555555-5555-4555-8555-555555555555',
-    });
+    request
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 201,
+        data: apiPayment,
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        data: {
+          ...apiInvoice,
+          balance: '50000.00',
+          version: 4,
+        },
+      });
 
-    expect(request).toHaveBeenCalledExactlyOnceWith({
+    await root.registerPayment(paymentIntent);
+
+    expect(request).toHaveBeenCalledTimes(2);
+
+    expect(request).toHaveBeenNthCalledWith(1, {
       method: 'POST',
       path: `/api/v1/invoices/${invoiceId}/payments`,
       body: {
@@ -105,12 +120,20 @@ it('registers a payment through the shared HTTP client using the actual invoice 
         expectedVersion: 3,
       },
       headers: {
-        'Idempotency-Key': '55555555-5555-4555-8555-555555555555',
+        'Idempotency-Key': paymentIntent.idempotencyKey,
       },
       signal: context.signal,
     });
 
+    expect(request).toHaveBeenNthCalledWith(2, {
+      method: 'GET',
+      path: `/api/v1/invoices/${invoiceId}`,
+      signal: expect.any(AbortSignal),
+    });
+
     expect(root.payments.read()).toEqual(before);
+    expect(root.displayedPaymentInvoiceReadState().invoice?.balance)
+      .toBe('50000.00');
   } finally {
     injector.destroy();
   }
@@ -125,13 +148,7 @@ it('rejects payment requests when the user lacks payment permissions', async () 
       user: { roles: ['DENTIST'] },
     } as never);
 
-    await root.registerPayment({
-      invoiceId,
-      amount: '25000.00',
-      method: 'CASH',
-      expectedVersion: 3,
-      idempotencyKey: '55555555-5555-4555-8555-555555555555',
-    });
+    await root.registerPayment(paymentIntent);
 
     expect(request).not.toHaveBeenCalled();
   } finally {
@@ -144,11 +161,8 @@ it('rejects payments when the supplied invoice version is stale', async () => {
 
   try {
     await root.registerPayment({
-      invoiceId,
-      amount: '25000.00',
-      method: 'CASH',
+      ...paymentIntent,
       expectedVersion: 2,
-      idempotencyKey: '55555555-5555-4555-8555-555555555555',
     });
 
     expect(request).not.toHaveBeenCalled();
@@ -161,34 +175,33 @@ it('prevents duplicate submissions while a payment request is pending', async ()
   const { root, injector, request } = setup();
 
   try {
-    let resolveRequest!: (value: unknown) => void;
+    let resolvePayment!: (value: unknown) => void;
 
-    request.mockReturnValue(
-      new Promise(resolve => {
-        resolveRequest = resolve;
+    request.mockImplementationOnce(
+      () => new Promise(resolve => {
+        resolvePayment = resolve;
       }),
     );
 
-    const intent = {
-      invoiceId,
-      amount: '25000.00',
-      method: 'CASH',
-      expectedVersion: 3,
-      idempotencyKey: '55555555-5555-4555-8555-555555555555',
-    };
-
-    const pending = root.registerPayment(intent);
-    await root.registerPayment(intent);
+    const first = root.registerPayment(paymentIntent);
+    await root.registerPayment(paymentIntent);
 
     expect(request).toHaveBeenCalledTimes(1);
+    expect(root.recordingPayment()).toBe(true);
 
-    resolveRequest({
+    resolvePayment({
       ok: true,
       status: 201,
       data: apiPayment,
     });
 
-    await pending;
+    await first;
+
+    expect(
+      request.mock.calls.filter(call => call[0].method === 'POST'),
+    ).toHaveLength(1);
+
+    expect(root.recordingPayment()).toBe(false);
   } finally {
     injector.destroy();
   }
