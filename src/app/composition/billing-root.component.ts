@@ -31,6 +31,7 @@ import {
 import { PricingCatalogComponent } from '../billing/catalog/pages/pricing-catalog/pricing-catalog.component';
 import { DemoInvoicePayments } from '../billing/data/demo-invoice-payments';
 import { InvoicePaymentPageComponent } from '../billing/pages/invoice-payment-page.component';
+import { InvoicePaymentHttpPageComponent } from '../billing/pages/invoice-payment-http-page.component';
 
 export const BILLING_CONTEXT = new InjectionToken<PortalContext>('billing.context');
 
@@ -43,6 +44,7 @@ export const BILLING_CONTEXT = new InjectionToken<PortalContext>('billing.contex
     InvoiceDetailHttpPageComponent,
     PricingCatalogComponent,
     InvoicePaymentPageComponent,
+    InvoicePaymentHttpPageComponent,
   ],
   template: `@if (isInvoiceList()) {
     <dlc-billing-list-page [composed]="true" [readOnly]="invoiceListMode() === 'http'"
@@ -70,8 +72,21 @@ export const BILLING_CONTEXT = new InjectionToken<PortalContext>('billing.contex
         (pay)="openPayment($event)" (back)="backToList()" />
     }
   } @else if (isPaymentRoute()) {
-    <dlc-invoice-payment-page [session]="payments" [invoiceId]="selectedInvoice()?.id ?? ''"
-      [canPay]="canRecordPayments()" (back)="backToList()" />
+    @if (useHttpPaymentForm()) {
+      <dlc-invoice-payment-http-page
+        [readState]="displayedPaymentInvoiceReadState()"
+        [canRecordPayments]="canRecordPayments()"
+        [recording]="recordingPayment()"
+        (record)="requestPaymentRegistration($event)"
+        (back)="backToList()" />
+      @if (paymentRegistrationMessage()) {
+        <p role="alert">{{ paymentRegistrationMessage() }}</p>
+      }
+    } @else {
+      <dlc-invoice-payment-page [session]="payments"
+        [invoiceId]="selectedInvoice()?.id ?? ''"
+        [canPay]="canRecordPayments()" (back)="backToList()" />
+    }
   } @else if (isProcedures()) {
     <dlc-pricing-catalog [composed]="true" [canManagePrices]="canManagePrices()" />
   } @else {
@@ -170,10 +185,15 @@ export class BillingCompositionRoot {
   readonly isProcedures = computed(() => this.route().localPath === '/procedures');
   readonly catalog = viewChild(PricingCatalogComponent);
   readonly paymentPage = viewChild(InvoicePaymentPageComponent);
+  readonly httpPaymentPage = viewChild(InvoicePaymentHttpPageComponent);
 
   canLeave(): boolean {
     const page = this.catalog();
-    return (!page || (!page.formVisible() && !page.submitting())) && !this.paymentPage()?.dirty;
+    const catalogSafe = !page || (!page.formVisible() && !page.submitting());
+    const demoSafe = !this.paymentPage()?.dirty;
+    const httpSafe = !this.httpPaymentPage()?.dirty && !this.recordingPayment();
+
+    return catalogSafe && demoSafe && httpSafe;
   }
 
   private readonly invoiceId = computed(() => {
@@ -190,6 +210,9 @@ export class BillingCompositionRoot {
 
   readonly useHttpInvoiceDetail = computed(() =>
     this.isInvoiceDetail() && this.invoiceListMode() === 'http');
+
+  readonly useHttpPaymentForm = computed(() =>
+    this.isPaymentRoute() && this.invoiceListMode() === 'http');
 
   readonly canIssueInvoices = computed(() =>
     this.useHttpInvoiceDetail()
@@ -209,6 +232,21 @@ export class BillingCompositionRoot {
 
   readonly displayedInvoiceDetailReadState = computed(() => {
     if (!this.useHttpInvoiceDetail()) {
+      return createInvoiceDetailReadState();
+    }
+
+    const state = this.invoiceDetailReadState();
+    const routeInvoiceId = this.invoiceId();
+
+    if (state.invoice?.id !== undefined && state.invoice.id !== routeInvoiceId) {
+      return createInvoiceDetailReadState();
+    }
+
+    return state;
+  });
+
+  readonly displayedPaymentInvoiceReadState = computed(() => {
+    if (!this.useHttpPaymentForm()) {
       return createInvoiceDetailReadState();
     }
 
@@ -292,6 +330,10 @@ export class BillingCompositionRoot {
         this.recordingPayment.set(false);
       }
     }
+  }
+
+  requestPaymentRegistration(request: RecordPaymentRequest): void {
+    void this.registerPayment(request);
   }
 
   async downloadInvoicePdf(invoiceId: string): Promise<void> {
