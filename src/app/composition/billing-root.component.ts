@@ -101,6 +101,10 @@ export class BillingCompositionRoot {
   private invoiceRequestGeneration = 0;
   private invoiceDetailRequestGeneration = 0;
   private pendingInvoice?: string;
+  private pendingDetailId?: string;
+  private pendingDetailLoad?: Promise<void>;
+  private loadedDetailId?: string;
+
   private issuanceAttempt?: InvoiceIssuanceIntent & {
     readonly idempotencyKey: string;
   };
@@ -176,6 +180,46 @@ export class BillingCompositionRoot {
     );
   }
 
+  async syncInvoiceRoute(): Promise<void> {
+    if (this.isInactive() || this.invoiceListMode() !== 'http') return;
+
+    const id = this.invoiceId();
+    if (!id || (!this.isInvoiceDetail() && !this.isPaymentRoute())) return;
+
+    if (this.pendingDetailId === id && this.pendingDetailLoad) {
+      return this.pendingDetailLoad;
+    }
+
+    if (this.loadedDetailId === id
+      && this.invoiceDetailReadState().status === 'success'
+      && this.invoiceDetailReadState().invoice?.id === id) {
+      return;
+    }
+
+    this.pendingDetailId = id;
+
+    const pending = this.loadInvoiceDetail(id).then(() => {
+      if (this.isInactive()) return;
+
+      const state = this.invoiceDetailReadState();
+      if (this.invoiceId() === id
+        && state.status === 'success'
+        && state.invoice?.id === id) {
+        this.loadedDetailId = id;
+      }
+    });
+
+    this.pendingDetailLoad = pending;
+    try {
+      await pending;
+    } finally {
+      if (this.pendingDetailId === id) {
+        this.pendingDetailId = undefined;
+        this.pendingDetailLoad = undefined;
+      }
+    }
+  }
+
   readonly canRecordPayments = computed(() => this.session()?.state === 'authenticated'
     && this.session()?.user?.roles.some(role =>
       ['ADMINISTRATOR', 'SECRETARY_ASSISTANT'].includes(role)
@@ -192,7 +236,6 @@ export class BillingCompositionRoot {
     const catalogSafe = !page || (!page.formVisible() && !page.submitting());
     const demoSafe = !this.paymentPage()?.dirty;
     const httpSafe = !this.httpPaymentPage()?.dirty && !this.recordingPayment();
-
     return catalogSafe && demoSafe && httpSafe;
   }
 
@@ -234,14 +277,11 @@ export class BillingCompositionRoot {
     if (!this.useHttpInvoiceDetail()) {
       return createInvoiceDetailReadState();
     }
-
     const state = this.invoiceDetailReadState();
     const routeInvoiceId = this.invoiceId();
-
     if (state.invoice?.id !== undefined && state.invoice.id !== routeInvoiceId) {
       return createInvoiceDetailReadState();
     }
-
     return state;
   });
 
@@ -249,14 +289,11 @@ export class BillingCompositionRoot {
     if (!this.useHttpPaymentForm()) {
       return createInvoiceDetailReadState();
     }
-
     const state = this.invoiceDetailReadState();
     const routeInvoiceId = this.invoiceId();
-
     if (state.invoice?.id !== undefined && state.invoice.id !== routeInvoiceId) {
       return createInvoiceDetailReadState();
     }
-
     return state;
   });
 
@@ -302,7 +339,6 @@ export class BillingCompositionRoot {
 
     try {
       await recordPaymentHttp(this.context, request);
-
       if (isCurrent()) {
         this.paymentRegistrationMessage.set(
           'Pago registrado. Actualice el detalle de la factura para consultar el saldo.',
@@ -373,7 +409,6 @@ export class BillingCompositionRoot {
 
     try {
       const pdf = await downloadInvoicePdfHttp(this.context, invoiceId);
-
       if (isCurrent()) {
         deliverInvoicePdf(pdf, invoiceId);
       }
@@ -497,18 +532,13 @@ export class BillingCompositionRoot {
     }
 
     const previous = this.issuanceAttempt;
-
     const idempotencyKey =
       previous?.invoiceId === intent.invoiceId
       && previous.expectedVersion === intent.expectedVersion
         ? previous.idempotencyKey
         : crypto.randomUUID();
 
-    const request = {
-      ...intent,
-      idempotencyKey,
-    };
-
+    const request = { ...intent, idempotencyKey };
     this.issuanceAttempt = request;
     void this.issueInvoice(request);
   }
@@ -536,10 +566,10 @@ export class BillingCompositionRoot {
 
   private async navigate(path: string): Promise<void> {
     if (this.isInactive() || this.pendingInvoice === path) return;
+
     this.pendingInvoice = path;
     const generation = ++this.navigationGeneration;
     this.navigationMessage.set('');
-
     try {
       const result = await this.context.navigation.request({ path });
       if (!this.isInactive() && generation === this.navigationGeneration && result.status !== 'applied') {
