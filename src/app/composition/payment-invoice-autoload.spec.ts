@@ -61,10 +61,15 @@ function setup(localPath = `/invoices/${invoiceId}/payment`) {
   return { root, injector, request, controller };
 }
 
-it('uses the real invoice mode when the portal starts', () => {
+it('supports activating real invoice mode without changing its demo default', () => {
   const { root, injector } = setup();
 
   try {
+    expect(root.invoiceListMode()).toBe('demo');
+    expect(root.useHttpPaymentForm()).toBe(false);
+
+    root.invoiceListMode.set('http');
+
     expect(root.invoiceListMode()).toBe('http');
     expect(root.useHttpPaymentForm()).toBe(true);
   } finally {
@@ -77,6 +82,7 @@ it('loads the invoice automatically when entering a payment route', async () => 
 
   try {
     request.mockResolvedValue(invoiceResponse(invoiceId));
+    root.invoiceListMode.set('http');
 
     await root.syncInvoiceRoute();
 
@@ -98,6 +104,7 @@ it('does not reload the same invoice unnecessarily', async () => {
 
   try {
     request.mockResolvedValue(invoiceResponse(invoiceId));
+    root.invoiceListMode.set('http');
 
     await root.syncInvoiceRoute();
     await root.syncInvoiceRoute();
@@ -117,6 +124,8 @@ it('loads a new invoice and ignores outdated responses after changing routes', a
     request.mockImplementation(() => new Promise(resolve => {
       resolvers.push(resolve);
     }));
+
+    root.invoiceListMode.set('http');
 
     const first = root.syncInvoiceRoute();
 
@@ -149,6 +158,8 @@ it('does not publish late responses after destroying the composition root', asyn
   request.mockReturnValue(new Promise(resolve => {
     resolveRequest = resolve;
   }));
+
+  root.invoiceListMode.set('http');
 
   const pending = root.syncInvoiceRoute();
   const writes = vi.spyOn(root.invoiceDetailReadState, 'set');
