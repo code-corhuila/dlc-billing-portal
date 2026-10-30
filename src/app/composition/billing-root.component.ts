@@ -1,5 +1,9 @@
 import { Component, DestroyRef, InjectionToken, computed, inject, signal, viewChild } from '@angular/core';
 import { PortalContext } from '../shell-contract';
+import {
+  recordManualChargeHttp,
+  type RecordManualChargeRequest,
+} from '../billing/data/manual-charge-http';
 import { BillingListPageComponent } from '../billing/pages/billing-list-page.component';
 import { INVOICE_LIST_SOURCE } from '../billing/data/invoice-list-source';
 import { loadInvoiceReadState } from '../billing/data/invoice-read-flow';
@@ -118,6 +122,16 @@ export class BillingCompositionRoot {
   readonly issuanceMessage = signal('');
   readonly downloadingPdf = signal(false);
   readonly pdfDownloadMessage = signal('');
+
+  readonly manualChargeContext = signal<Readonly<{
+    patientId: string;
+    appointmentId: string;
+    procedureId: string;
+    sourceRecordId: string;
+  }> | null>(null);
+
+  readonly recordingManualCharge = signal(false);
+  readonly manualChargeMessage = signal('');
   readonly recordingPayment = signal(false);
   readonly paymentRegistrationMessage = signal('');
 
@@ -220,6 +234,12 @@ export class BillingCompositionRoot {
     }
   }
 
+  readonly canRecordManualCharges = computed(() =>
+    this.session()?.state === 'authenticated'
+    && this.session()?.user?.roles.some(role =>
+      ['ADMINISTRATOR', 'DENTIST'].includes(role)
+    ) === true);
+
   readonly canRecordPayments = computed(() => this.session()?.state === 'authenticated'
     && this.session()?.user?.roles.some(role =>
       ['ADMINISTRATOR', 'SECRETARY_ASSISTANT'].includes(role)
@@ -301,6 +321,58 @@ export class BillingCompositionRoot {
     const id = this.invoiceId();
     return id === undefined ? undefined : this.payments.detail(id);
   });
+
+  async registerManualCharge(request: RecordManualChargeRequest): Promise<void> {
+    const source = this.manualChargeContext();
+
+    if (
+      this.isInactive()
+      || this.recordingManualCharge()
+      || !this.canRecordManualCharges()
+      || !source
+      || source.patientId !== request.patientId
+      || source.appointmentId !== request.appointmentId
+      || source.procedureId !== request.procedureId
+      || source.sourceRecordId !== request.sourceRecordId
+    ) {
+      return;
+    }
+
+    const initialSource = source;
+    const initialRoute = this.route().localPath;
+
+    const isCurrent = () =>
+      !this.isInactive()
+      && this.canRecordManualCharges()
+      && this.manualChargeContext() === initialSource
+      && this.route().localPath === initialRoute;
+
+    this.manualChargeMessage.set('');
+    this.recordingManualCharge.set(true);
+
+    try {
+      await recordManualChargeHttp(this.context, request);
+
+      if (isCurrent()) {
+        this.manualChargeMessage.set('Cargo manual registrado correctamente.');
+      }
+    } catch {
+      if (isCurrent()) {
+        this.manualChargeMessage.set(
+          'No se pudo registrar el cargo manual. Revise los datos e inténtelo nuevamente.',
+        );
+        this.context.reportFailure({ code: 'PORTAL_TASK_FAILED' });
+      }
+    } finally {
+      if (!this.isInactive()) {
+        this.recordingManualCharge.set(false);
+      }
+    }
+  }
+
+  requestManualChargeRegistration(request: RecordManualChargeRequest): void {
+    void this.registerManualCharge(request);
+  }
 
   async registerPayment(request: RecordPaymentRequest): Promise<void> {
     if (
@@ -582,6 +654,7 @@ export class BillingCompositionRoot {
     this.pendingInvoice = path;
     const generation = ++this.navigationGeneration;
     this.navigationMessage.set('');
+
     try {
       const result = await this.context.navigation.request({ path });
       if (!this.isInactive() && generation === this.navigationGeneration && result.status !== 'applied') {
