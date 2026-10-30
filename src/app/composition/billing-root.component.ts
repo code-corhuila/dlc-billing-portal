@@ -1,5 +1,6 @@
 import { Component, DestroyRef, InjectionToken, computed, inject, signal, viewChild } from '@angular/core';
 import { PortalContext } from '../shell-contract';
+import { ManualChargeFormComponent } from '../billing/pages/manual-charge-form.component';
 import {
   recordManualChargeHttp,
   type RecordManualChargeRequest,
@@ -49,6 +50,7 @@ export const BILLING_CONTEXT = new InjectionToken<PortalContext>('billing.contex
     PricingCatalogComponent,
     InvoicePaymentPageComponent,
     InvoicePaymentHttpPageComponent,
+    ManualChargeFormComponent,
   ],
   template: `@if (isInvoiceList()) {
     <dlc-billing-list-page [composed]="true" [readOnly]="invoiceListMode() === 'http'"
@@ -90,6 +92,27 @@ export const BILLING_CONTEXT = new InjectionToken<PortalContext>('billing.contex
       <dlc-invoice-payment-page [session]="payments"
         [invoiceId]="selectedInvoice()?.id ?? ''"
         [canPay]="canRecordPayments()" (back)="backToList()" />
+    }
+  } @else if (isManualChargeRoute()) {
+    @if (manualChargeContext(); as source) {
+      <dlc-manual-charge-form
+        [patientId]="source.patientId"
+        [appointmentId]="source.appointmentId"
+        [procedureId]="source.procedureId"
+        [sourceRecordId]="source.sourceRecordId"
+        [canRecordManualCharges]="canSubmitManualCharge()"
+        [recording]="recordingManualCharge()"
+        (record)="requestManualChargeRegistration($event)" />
+    } @else {
+      <section aria-label="Cargo manual no disponible">
+        <h1>Registro de cargo manual</h1>
+        <p role="status">
+          No hay una fuente clínica autorizada seleccionada.
+        </p>
+      </section>
+    }
+    @if (manualChargeMessage()) {
+      <p role="alert">{{ manualChargeMessage() }}</p>
     }
   } @else if (isProcedures()) {
     <dlc-pricing-catalog [composed]="true" [canManagePrices]="canManagePrices()" />
@@ -240,6 +263,16 @@ export class BillingCompositionRoot {
       ['ADMINISTRATOR', 'DENTIST'].includes(role)
     ) === true);
 
+  readonly isManualChargeRoute = computed(() =>
+    this.invoiceListMode() === 'http'
+    && this.route().localPath === '/manual-charges/new');
+
+  readonly canSubmitManualCharge = computed(() =>
+    this.isManualChargeRoute()
+    && this.canRecordManualCharges()
+    && this.manualChargeContext() !== null
+    && !this.recordingManualCharge());
+
   readonly canRecordPayments = computed(() => this.session()?.state === 'authenticated'
     && this.session()?.user?.roles.some(role =>
       ['ADMINISTRATOR', 'SECRETARY_ASSISTANT'].includes(role)
@@ -250,13 +283,16 @@ export class BillingCompositionRoot {
   readonly catalog = viewChild(PricingCatalogComponent);
   readonly paymentPage = viewChild(InvoicePaymentPageComponent);
   readonly httpPaymentPage = viewChild(InvoicePaymentHttpPageComponent);
+  readonly manualChargePage = viewChild(ManualChargeFormComponent);
 
   canLeave(): boolean {
     const page = this.catalog();
     const catalogSafe = !page || (!page.formVisible() && !page.submitting());
     const demoSafe = !this.paymentPage()?.dirty;
     const httpSafe = !this.httpPaymentPage()?.dirty && !this.recordingPayment();
-    return catalogSafe && demoSafe && httpSafe;
+    const manualSafe =
+      !this.manualChargePage()?.dirty && !this.recordingManualCharge();
+    return catalogSafe && demoSafe && httpSafe && manualSafe;
   }
 
   private readonly invoiceId = computed(() => {
@@ -675,3 +711,4 @@ export class BillingCompositionRoot {
     return this.context.signal.aborted || this.destroyRef.destroyed;
   }
 }
+
