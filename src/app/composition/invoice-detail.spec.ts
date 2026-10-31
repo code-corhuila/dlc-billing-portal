@@ -309,3 +309,28 @@ it('keeps demo invoice selection independent of HTTP route consistency', () => {
     expect(frame.displayedInvoiceDetailReadState().invoice).toBeUndefined();
   } finally { injector.destroy(); }
 });
+
+it('enables HTTP invoice navigation only on the invoice list route', () => {
+  const { frame, injector } = setup('/');
+  try {
+    expect(frame.canNavigateHttpInvoices()).toBe(false);
+
+    frame.invoiceListMode.set('http');
+    expect(frame.canNavigateHttpInvoices()).toBe(true);
+
+    frame.route.set({
+      ...frame.route(),
+      localPath: '/invoices/invoice-001',
+    });
+    expect(frame.canNavigateHttpInvoices()).toBe(false);
+  } finally { injector.destroy(); }
+});
+
+it('does not enable HTTP invoice navigation in demo mode', () => {
+  const { frame, injector } = setup('/');
+  try {
+    expect(frame.invoiceListMode()).toBe('demo');
+    expect(frame.canNavigateHttpInvoices()).toBe(false);
+  } finally { injector.destroy(); }
+});
+
