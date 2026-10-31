@@ -223,6 +223,28 @@ describe('BillingListPageComponent', () => {
     expect(component.getInvoiceDetailPath('invoice-002')).toBeNull();
   });
 
+  it('allows explicitly enabled HTTP invoice navigation', () => {
+    component.readOnly = true;
+    component.canNavigateToInvoice = true;
+
+    expect(component.canOpenInvoice).toBe(true);
+  });
+
+  it('keeps HTTP invoice navigation disabled by default', () => {
+    component.readOnly = true;
+
+    expect(component.canNavigateToInvoice).toBe(false);
+    expect(component.canOpenInvoice).toBe(false);
+  });
+
+  it('does not reveal demo summaries when HTTP navigation is enabled', () => {
+    component.readOnly = true;
+    component.canNavigateToInvoice = true;
+
+    expect(component.showDemoSummary).toBe(false);
+    expect(component.patientColumnLabel).toBe('ID del paciente');
+  });
+
   it('identifies patient references without claiming they are names', () => {
     component.readOnly = true;
     component.invoices = [
