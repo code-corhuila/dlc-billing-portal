@@ -225,6 +225,7 @@ describe('BillingListPageComponent', () => {
 
   it('allows explicitly enabled HTTP invoice navigation', () => {
     component.readOnly = true;
+    component.composed = true;
     component.canNavigateToInvoice = true;
 
     expect(component.canOpenInvoice).toBe(true);
@@ -239,6 +240,7 @@ describe('BillingListPageComponent', () => {
 
   it('does not reveal demo summaries when HTTP navigation is enabled', () => {
     component.readOnly = true;
+    component.composed = true;
     component.canNavigateToInvoice = true;
 
     expect(component.showDemoSummary).toBe(false);
