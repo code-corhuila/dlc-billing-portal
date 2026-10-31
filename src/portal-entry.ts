@@ -70,6 +70,8 @@ export async function mount(host: HTMLElement, context: PortalContext): Promise<
 
       if (root.route().localPath === '/') {
         await root.loadInvoices();
+      } else if (root.route().localPath === '/procedures') {
+        await root.loadProcedurePrices();
       } else {
         await root.syncInvoiceRoute();
       }
