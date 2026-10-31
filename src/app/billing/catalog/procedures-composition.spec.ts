@@ -84,6 +84,7 @@ it('displays HTTP procedure prices instead of fixtures in composed mode', () => 
       status: 'ACTIVE',
       version: 1,
     }];
+page.httpReadStatus = 'success';
 
     expect(page.displayedPrices.map(price => price.id)).toEqual(['real-001']);
     expect(page.displayedPrices[0].basePrice).toBe('150000.00');

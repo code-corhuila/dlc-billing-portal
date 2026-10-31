@@ -117,8 +117,12 @@ export const BILLING_CONTEXT = new InjectionToken<PortalContext>('billing.contex
     @if (manualChargeMessage()) {
       <p role="alert">{{ manualChargeMessage() }}</p>
     }
-  } @else if (isProcedures()) {
-    <dlc-pricing-catalog [composed]="true" [canManagePrices]="canManagePrices()" />
+ } @else if (isProcedures()) {
+  <dlc-pricing-catalog
+    [composed]="true"
+    [canManagePrices]="canManagePrices()"
+    [httpPrices]="procedurePricesReadState().prices"
+    [httpReadStatus]="procedurePricesReadState().status" />
   } @else {
     <section aria-label="Billing"><h1 tabindex="-1">{{ title() }}</h1>
       <p role="status">{{ message() }}</p></section>
