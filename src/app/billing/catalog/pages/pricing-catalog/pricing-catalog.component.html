@@ -11,22 +11,23 @@
         Precios base y versiones para atención en el Consultorio Dental DI-LUCCA.
       </p>
     </div>
-
     <div class="header-actions">
 
       @if (!composed) { <a routerLink="/prices/rules" class="secondary-link">
         Reglas adicionales
       </a> }
 
+      @if (!composed) {
       <button #newPriceButton type="button" class="primary-button" [disabled]="!canManagePrices || submitting()" (click)="openForm()">
         + Nuevo procedimiento
       </button>
+      }
 
     </div>
 
   </header>
 
-
+  @if (!composed) {
   <section class="mock-notice" role="note">
 
     <strong>
@@ -39,7 +40,7 @@
     </span>
 
   </section>
-
+  }
 
   <section class="toolbar">
 
@@ -48,15 +49,39 @@
       <span>
         Buscar procedimiento
       </span>
-
       <input type="search" placeholder="Buscar procedimiento por nombre o código..." [(ngModel)]="searchTerm" />
 
     </label>
 
-
-    <label class="active-filter"><input type="checkbox" [(ngModel)]="onlyActive" /> Solo vigentes y programados</label>
+    <label class="active-filter"><input type="checkbox" [(ngModel)]="onlyActive" /> {{ composed ? 'Solo activos' : 'Solo vigentes y programados' }}</label>
   </section>
 
+  @if (composed) {
+    @if (httpReadStatus === 'idle' || httpReadStatus === 'loading') {
+      <section class="state-card" role="status"><h2>Cargando catálogo</h2><p>Consultando precios de Billing.</p></section>
+    } @else if (httpReadStatus === 'error') {
+      <section class="state-card error-state" role="alert"><h2>No fue posible cargar el catálogo</h2><p>Inténtelo nuevamente más tarde.</p></section>
+    } @else if (displayedPrices.length === 0) {
+      <section class="state-card" role="status"><h2>No hay precios para mostrar</h2><p>No hay procedimientos con los criterios actuales.</p></section>
+    } @else {
+      <ul class="catalog-grid" aria-label="Versiones de precios">
+        @for (price of displayedPrices; track price.id) {
+          <li class="procedure-card"><article [attr.aria-label]="price.name + ', versión ' + price.version">
+            <div class="card-heading">
+              <strong class="card-price">{{ formatMoney(price.basePrice) }}</strong>
+              <span class="status-badge" [class.active]="price.status === 'ACTIVE'">{{ price.status === 'ACTIVE' ? 'Activo' : 'Inactivo' }}</span>
+            </div>
+            <h2>{{ price.name }}</h2><p class="procedure-code">{{ price.procedureCode }}</p>
+            <footer class="card-footer">
+              <span class="version-badge">Versión {{ price.version }}</span>
+              <span>Desde @if (price.validFrom) { <time [attr.datetime]="price.validFrom">{{ price.validFrom }}</time> } @else { No disponible }
+                @if (price.validTo) { · Hasta <time [attr.datetime]="price.validTo">{{ price.validTo }}</time> }</span>
+            </footer>
+          </article></li>
+        }
+      </ul>
+    }
+  } @else {
 
   @if (errorMessage()) {
 
@@ -90,7 +115,6 @@
     </p>
 
   </section>
-
   } @else {
 
   <ul class="catalog-grid" aria-label="Versiones de precios">
@@ -120,18 +144,17 @@
 
   }
 
+  }
 
-  @if (successMessage()) {
-
+  @if (!composed && successMessage()) {
   <section class="success-message" role="status">
     {{ successMessage() }}
   </section>
 
   }
 
-
+  @if (!composed) {
     <dialog #priceDialog class="modal" aria-labelledby="new-price-title" (cancel)="$event.preventDefault(); closeForm()">
-
       <header class="modal-header">
 
         <div>
@@ -146,14 +169,12 @@
 
         </div>
 
-
         <button type="button" class="icon-button" aria-label="Cerrar formulario" [disabled]="submitting()"
           (click)="closeForm()">
           ×
         </button>
 
       </header>
-
 
       <form (ngSubmit)="submitPrice()" #priceForm="ngForm">
 
@@ -174,7 +195,6 @@
 
           </label>
 
-
           <label>
 
             <span>
@@ -185,7 +205,6 @@
               autofocus [readonly]="editing" [disabled]="submitting()" />
 
           </label>
-
 
           <label>
 
@@ -204,7 +223,6 @@
 
           </label>
 
-
           <label>
 
             <span>
@@ -214,7 +232,6 @@
             <input type="text" value="COP" disabled />
 
           </label>
-
 
           <label>
 
@@ -233,13 +250,11 @@
 
         </div>
 
-
         <footer class="modal-actions">
 
           <button type="button" class="secondary-button" [disabled]="submitting()" (click)="closeForm()">
             Cancelar
           </button>
-
 
           <button type="submit" class="primary-button" [disabled]="
                 !canManagePrices || priceForm.invalid ||
@@ -258,5 +273,7 @@
       </form>
 
     </dialog>
+
+  }
 
 </section>

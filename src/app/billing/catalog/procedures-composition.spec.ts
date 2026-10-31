@@ -66,3 +66,72 @@ it('cancels its pending demo timer on destruction without updating shared catalo
   expect(writes).not.toHaveBeenCalled();
   expect(vi.getTimerCount()).toBe(0);
 });
+
+it('displays HTTP procedure prices instead of fixtures in composed mode', () => {
+  const injector = Injector.create({
+    providers: [{ provide: PricingCatalogService, useValue: new PricingCatalogService() }],
+  });
+
+  try {
+    const page = runInInjectionContext(injector, () => new PricingCatalogComponent());
+    page.composed = true;
+    page.httpPrices = [{
+      id: 'real-001',
+      procedureCode: 'REAL-001',
+      name: 'Real procedure',
+      basePrice: '150000.00',
+      currency: 'COP',
+      status: 'ACTIVE',
+      version: 1,
+    }];
+page.httpReadStatus = 'success';
+
+    expect(page.displayedPrices.map(price => price.id)).toEqual(['real-001']);
+    expect(page.displayedPrices[0].basePrice).toBe('150000.00');
+  } finally {
+    injector.destroy();
+  }
+});
+
+it('never falls back to demo prices when the HTTP catalog is empty or fails', () => {
+  const injector = Injector.create({
+    providers: [{ provide: PricingCatalogService, useValue: new PricingCatalogService() }],
+  });
+
+  try {
+    const page = runInInjectionContext(injector, () => new PricingCatalogComponent());
+    page.composed = true;
+    page.httpPrices = [];
+    page.httpReadStatus = 'success';
+
+    expect(page.displayedPrices).toEqual([]);
+
+    page.httpReadStatus = 'error';
+    expect(page.displayedPrices).toEqual([]);
+  } finally {
+    injector.destroy();
+  }
+});
+
+it('disables simulated price creation in composed mode', () => {
+  vi.useFakeTimers();
+  const injector = Injector.create({
+    providers: [{ provide: PricingCatalogService, useValue: new PricingCatalogService() }],
+  });
+
+  try {
+    const page = runInInjectionContext(injector, () => new PricingCatalogComponent());
+    page.composed = true;
+    page.canManagePrices = true;
+
+    page.openForm();
+    page.form = { ...request };
+    page.submitPrice();
+
+    expect(page.formVisible()).toBe(false);
+    expect(page.submitting()).toBe(false);
+    expect(vi.getTimerCount()).toBe(0);
+  } finally {
+    injector.destroy();
+  }
+});

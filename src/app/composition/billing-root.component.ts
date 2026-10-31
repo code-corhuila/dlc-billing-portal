@@ -34,6 +34,7 @@ import {
   type InvoiceIssuanceIntent,
 } from '../billing/pages/invoice-detail-http-page.component';
 import { PricingCatalogComponent } from '../billing/catalog/pages/pricing-catalog/pricing-catalog.component';
+import { readProcedurePricesHttp, type HttpProcedurePrice } from '../billing/catalog/data/procedure-prices-http';
 import { DemoInvoicePayments } from '../billing/data/demo-invoice-payments';
 import { InvoicePaymentPageComponent } from '../billing/pages/invoice-payment-page.component';
 import { InvoicePaymentHttpPageComponent } from '../billing/pages/invoice-payment-http-page.component';
@@ -116,8 +117,12 @@ export const BILLING_CONTEXT = new InjectionToken<PortalContext>('billing.contex
     @if (manualChargeMessage()) {
       <p role="alert">{{ manualChargeMessage() }}</p>
     }
-  } @else if (isProcedures()) {
-    <dlc-pricing-catalog [composed]="true" [canManagePrices]="canManagePrices()" />
+ } @else if (isProcedures()) {
+  <dlc-pricing-catalog
+    [composed]="true"
+    [canManagePrices]="canManagePrices()"
+    [httpPrices]="procedurePricesReadState().prices"
+    [httpReadStatus]="procedurePricesReadState().status" />
   } @else {
     <section aria-label="Billing"><h1 tabindex="-1">{{ title() }}</h1>
       <p role="status">{{ message() }}</p></section>
@@ -129,6 +134,7 @@ export class BillingCompositionRoot {
   private navigationGeneration = 0;
   private invoiceRequestGeneration = 0;
   private invoiceDetailRequestGeneration = 0;
+  private procedurePricesRequestGeneration = 0;
   private pendingInvoice?: string;
   private pendingDetailId?: string;
   private pendingDetailLoad?: Promise<void>;
@@ -142,6 +148,10 @@ export class BillingCompositionRoot {
   readonly session = signal(this.context.session.getSnapshot());
   readonly invoiceReadState = signal(createInvoiceReadState());
   readonly invoiceDetailReadState = signal(createInvoiceDetailReadState());
+  readonly procedurePricesReadState = signal<{
+    status: 'idle' | 'loading' | 'success' | 'error';
+    prices: HttpProcedurePrice[];
+  }>({ status: 'idle', prices: [] });
   readonly invoiceListMode = signal<'demo' | 'http'>('demo');
   readonly issuingInvoice = signal(false);
   readonly issuanceMessage = signal('');
@@ -200,6 +210,24 @@ export class BillingCompositionRoot {
         }
       },
     );
+  }
+
+  async loadProcedurePrices(): Promise<void> {
+    if (this.isInactive() || !this.isProcedures()) return;
+
+    const generation = ++this.procedurePricesRequestGeneration;
+    this.procedurePricesReadState.set({ status: 'loading', prices: [] });
+
+    try {
+      const result = await readProcedurePricesHttp(this.context);
+      if (this.isInactive() || !this.isProcedures()
+        || generation !== this.procedurePricesRequestGeneration) return;
+      this.procedurePricesReadState.set({ status: 'success', prices: result.data });
+    } catch {
+      if (this.isInactive() || !this.isProcedures()
+        || generation !== this.procedurePricesRequestGeneration) return;
+      this.procedurePricesReadState.set({ status: 'error', prices: [] });
+    }
   }
 
   async loadInvoiceDetail(invoiceId: string): Promise<void> {
