@@ -9,6 +9,7 @@ import { provideInvoiceListSource } from '../billing/data/invoice-list-source';
 import { dummyInvoiceList } from '../billing/data/invoice-list.dummy';
 import { invoiceDetailReadSuccess } from '../billing/data/invoice-detail-read-state';
 import { readInvoiceDetail } from '../billing/data/invoice-read-adapter';
+import { InvoiceDetailHttpPageComponent } from '../billing/pages/invoice-detail-http-page.component';
 import { InvoicePaymentHttpPageComponent } from '../billing/pages/invoice-payment-http-page.component';
 
 const invoiceId = '11111111-1111-4111-8111-111111111111';
@@ -194,6 +195,45 @@ it('uses the current payment read state instead of an unrelated invoice', () => 
       status: 'idle',
       invoice: undefined,
     });
+  } finally {
+    injector.destroy();
+  }
+});
+
+it('navigates from HTTP invoice detail to the existing payment form', async () => {
+  const { root, injector, context } = setup(`/invoices/${invoiceId}`);
+
+  try {
+    root.invoiceDetailReadState.set(
+      invoiceDetailReadSuccess(readInvoiceDetail(apiInvoice)),
+    );
+
+    const detail = new InvoiceDetailHttpPageComponent();
+    detail.readState = root.displayedInvoiceDetailReadState();
+    detail.canRecordPayments = root.canRecordPayments();
+
+    expect(detail.canPay).toBe(true);
+
+    detail.pay.subscribe(id => {
+      void root.openPayment(id);
+    });
+
+    detail.requestPayment();
+
+    await vi.waitFor(() => {
+      expect(context.navigation.request).toHaveBeenCalledExactlyOnceWith({
+        path: `/app/billing/invoices/${invoiceId}/payment`,
+      });
+    });
+
+    root.route.set({
+      ...root.route(),
+      localPath: `/invoices/${invoiceId}/payment`,
+    });
+
+    expect(root.useHttpPaymentForm()).toBe(true);
+    expect(root.displayedPaymentInvoiceReadState().invoice?.id)
+      .toBe(invoiceId);
   } finally {
     injector.destroy();
   }
