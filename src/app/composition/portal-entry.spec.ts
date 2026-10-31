@@ -17,6 +17,7 @@ const root = {
   invoiceListMode: signal<'demo' | 'http'>('demo'),
   loadInvoices: vi.fn().mockResolvedValue(undefined),
   syncInvoiceRoute: vi.fn().mockResolvedValue(undefined),
+  loadProcedurePrices: vi.fn().mockResolvedValue(undefined),
   canLeave: vi.fn(() => true),
 };
 const child = { remove: vi.fn() };
@@ -505,5 +506,18 @@ it('selects HTTP invoice rows and status only when explicitly enabled', async ()
   } finally {
     injector.destroy();
   }
+});
+
+it('loads procedure prices when navigating to the composed catalog', async () => {
+  const handle = await mount();
+
+  root.loadProcedurePrices.mockClear();
+
+  await handle.updateRoute(route('/procedures'));
+
+  expect(root.loadProcedurePrices).toHaveBeenCalledTimes(1);
+  expect(root.route().localPath).toBe('/procedures');
+
+  await handle.unmount();
 });
 
