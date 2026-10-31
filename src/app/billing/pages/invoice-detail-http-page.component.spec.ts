@@ -90,7 +90,7 @@ it('reports cancellation without presenting invoice data', () => {
   expect(page.statusMessage).toBe('La consulta de la factura fue cancelada.');
 });
 
-it('provides a back event without payment actions', () => {
+it('provides a back event', () => {
   const page = setup();
   const back = vi.fn();
 
@@ -98,7 +98,6 @@ it('provides a back event without payment actions', () => {
   page.back.emit();
 
   expect(back).toHaveBeenCalledOnce();
-  expect('pay' in page).toBe(false);
 });
 
 it('does not allow issuance by default', () => {
@@ -288,4 +287,68 @@ it('does not emit a PDF download event when unauthorized', () => {
   page.requestPdfDownload();
 
   expect(download).not.toHaveBeenCalled();
+});
+
+it('disables payment navigation by default', () => {
+  const page = setup(invoiceDetailReadSuccess(invoice));
+
+  expect(page.canPay).toBe(false);
+});
+
+it.each(['ISSUED', 'PARTIALLY_PAID'] as const)(
+  'allows authorized payment navigation for %s invoices with balance',
+  status => {
+    const page = setup(invoiceDetailReadSuccess({ ...invoice, status }));
+    page.canRecordPayments = true;
+
+    expect(page.canPay).toBe(true);
+  },
+);
+
+it.each(['DRAFT', 'PAID', 'CANCELLED'] as const)(
+  'blocks payment navigation for %s invoices',
+  status => {
+    const page = setup(invoiceDetailReadSuccess({ ...invoice, status }));
+    page.canRecordPayments = true;
+
+    expect(page.canPay).toBe(false);
+  },
+);
+
+it('blocks payment navigation when the balance is zero', () => {
+  const page = setup(invoiceDetailReadSuccess({
+    ...invoice,
+    balance: copMoney('0.00'),
+  }));
+  page.canRecordPayments = true;
+
+  expect(page.canPay).toBe(false);
+});
+
+it('emits the invoice identifier only when payment is authorized', () => {
+  const page = setup(invoiceDetailReadSuccess(invoice));
+  const pay = vi.fn();
+  page.pay.subscribe(pay);
+
+  page.requestPayment();
+  expect(pay).not.toHaveBeenCalled();
+
+  page.canRecordPayments = true;
+  page.requestPayment();
+
+  expect(pay).toHaveBeenCalledExactlyOnceWith(invoice.id);
+  expect(page.selectedInvoice?.status).toBe('PARTIALLY_PAID');
+  expect(page.selectedInvoice?.balance).toBe('75000.00');
+});
+
+it('does not emit payment navigation without a loaded invoice', () => {
+  const page = setup();
+  const pay = vi.fn();
+  page.pay.subscribe(pay);
+  page.canRecordPayments = true;
+
+  page.requestPayment();
+
+  expect(page.canPay).toBe(false);
+  expect(pay).not.toHaveBeenCalled();
 });
