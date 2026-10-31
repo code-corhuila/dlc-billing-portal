@@ -54,7 +54,7 @@ export const BILLING_CONTEXT = new InjectionToken<PortalContext>('billing.contex
   ],
   template: `@if (isInvoiceList()) {
     <dlc-billing-list-page [composed]="true" [readOnly]="invoiceListMode() === 'http'"
-      [readStatus]="displayedReadStatus()" [invoices]="displayedInvoices()"
+      [canNavigateToInvoice]="canNavigateHttpInvoices()" [readStatus]="displayedReadStatus()" [invoices]="displayedInvoices()"
       (openInvoice)="openInvoice($event)" />
   } @else if (isInvoiceDetail()) {
     @if (useHttpInvoiceDetail()) {
@@ -279,6 +279,8 @@ export class BillingCompositionRoot {
     ) === true);
 
   readonly isInvoiceList = computed(() => this.route().localPath === '/');
+  readonly canNavigateHttpInvoices = computed(() =>
+    this.isInvoiceList() && this.invoiceListMode() === 'http');
   readonly isProcedures = computed(() => this.route().localPath === '/procedures');
   readonly catalog = viewChild(PricingCatalogComponent);
   readonly paymentPage = viewChild(InvoicePaymentPageComponent);
