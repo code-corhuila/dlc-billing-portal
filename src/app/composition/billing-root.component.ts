@@ -64,8 +64,10 @@ export const BILLING_CONTEXT = new InjectionToken<PortalContext>('billing.contex
         [issuing]="issuingInvoice()"
         [canDownloadPdfInvoices]="canDownloadPdfInvoices()"
         [downloadingPdf]="downloadingPdf()"
+        [canRecordPayments]="canRecordPayments()"
         (issue)="requestInvoiceIssuance($event)"
         (downloadPdf)="requestInvoicePdfDownload($event)"
+        (pay)="openPayment($event)"
         (back)="backToList()" />
       @if (issuanceMessage()) {
         <p role="alert">{{ issuanceMessage() }}</p>

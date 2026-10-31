@@ -61,6 +61,15 @@ export interface InvoiceIssuanceIntent {
               {{ downloadingPdf ? 'Descargando PDF...' : 'Descargar PDF' }}
             </button>
           }
+
+          @if (canPay) {
+            <button
+              type="button"
+              (click)="requestPayment()"
+            >
+              Registrar pago
+            </button>
+          }
         </article>
       } @else {
         <p role="status">{{ statusMessage }}</p>
@@ -74,10 +83,12 @@ export class InvoiceDetailHttpPageComponent {
   @Input() issuing = false;
   @Input() canDownloadPdfInvoices = false;
   @Input() downloadingPdf = false;
+  @Input() canRecordPayments = false;
 
   @Output() readonly back = new EventEmitter<void>();
   @Output() readonly issue = new EventEmitter<InvoiceIssuanceIntent>();
   @Output() readonly downloadPdf = new EventEmitter<string>();
+  @Output() readonly pay = new EventEmitter<string>();
 
   get selectedInvoice(): ReadInvoice | undefined {
     return this.readState.status === 'success'
@@ -97,15 +108,29 @@ export class InvoiceDetailHttpPageComponent {
       && this.selectedInvoice?.status === 'ISSUED';
   }
 
-  requestIssuance(): void {
-    if (!this.canIssue) {
-      return;
-    }
+  get canPay(): boolean {
+    const invoice = this.selectedInvoice;
+
+    return !!invoice
+      && this.canRecordPayments
+      && ['ISSUED', 'PARTIALLY_PAID'].includes(invoice.status)
+      && BigInt(invoice.balance.replace('.', '')) > 0n;
+  }
+
+  requestPayment(): void {
+    if (!this.canPay) return;
 
     const invoice = this.selectedInvoice;
-    if (!invoice) {
-      return;
-    }
+    if (!invoice) return;
+
+    this.pay.emit(invoice.id);
+  }
+
+  requestIssuance(): void {
+    if (!this.canIssue) return;
+
+    const invoice = this.selectedInvoice;
+    if (!invoice) return;
 
     this.issue.emit({
       invoiceId: invoice.id,
@@ -114,14 +139,10 @@ export class InvoiceDetailHttpPageComponent {
   }
 
   requestPdfDownload(): void {
-    if (!this.canDownloadPdf) {
-      return;
-    }
+    if (!this.canDownloadPdf) return;
 
     const invoice = this.selectedInvoice;
-    if (!invoice) {
-      return;
-    }
+    if (!invoice) return;
 
     this.downloadPdf.emit(invoice.id);
   }
@@ -169,3 +190,4 @@ export class InvoiceDetailHttpPageComponent {
     }
   }
 }
+
