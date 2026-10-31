@@ -23,6 +23,7 @@ type BillingInvoiceStatusFilter = 'ALL' | InvoiceListStatus;
         <p>
           Consulta las facturas y su estado de pago.
         </p>
+
         @if (readOnly) {
           <p role="note">Consulta de facturas en modo de solo lectura. El detalle y los pagos no están disponibles.</p>
         } @else {
@@ -216,17 +217,22 @@ type BillingInvoiceStatusFilter = 'ALL' | InvoiceListStatus;
 export class BillingListPageComponent {
   @Input() composed = false;
   @Input() readOnly = false;
+  @Input() canNavigateToInvoice = false;
   @Input() readStatus: InvoiceReadStatus = 'idle';
   @Output() readonly openInvoice = new EventEmitter<string>();
+
   readonly statusLabels: Record<InvoiceListStatus, string> = {
     DRAFT: 'Borrador', ISSUED: 'Emitida', PARTIALLY_PAID: 'Pago parcial',
     PAID: 'Pagada', CANCELLED: 'Cancelada',
   };
+
   readonly monthlyIncome = copMoney('250000.00');
   readonly formatAmount = formatCopMoney;
+
   get pendingInvoices(): number {
     return this.invoices.filter(invoice => ['ISSUED', 'PARTIALLY_PAID'].includes(invoice.status)).length;
   }
+
   get paidInvoices(): number {
     return this.invoices.filter(invoice => invoice.status === 'PAID').length;
   }
@@ -269,7 +275,7 @@ export class BillingListPageComponent {
   }
 
   get canOpenInvoice(): boolean {
-    return !this.readOnly;
+    return !this.readOnly || (this.composed && this.canNavigateToInvoice);
   }
 
   get patientColumnLabel(): string {
