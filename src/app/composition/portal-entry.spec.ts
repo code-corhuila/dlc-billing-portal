@@ -18,6 +18,7 @@ const root = {
   loadInvoices: vi.fn().mockResolvedValue(undefined),
   syncInvoiceRoute: vi.fn().mockResolvedValue(undefined),
   loadProcedurePrices: vi.fn().mockResolvedValue(undefined),
+  loadExtraChargeRules: vi.fn().mockResolvedValue(undefined),
   canLeave: vi.fn(() => true),
 };
 const child = { remove: vi.fn() };
@@ -517,6 +518,25 @@ it('loads procedure prices when navigating to the composed catalog', async () =>
 
   expect(root.loadProcedurePrices).toHaveBeenCalledTimes(1);
   expect(root.route().localPath).toBe('/procedures');
+
+  await handle.unmount();
+});
+
+it('loads additional price rules when navigating to the composed rules route', async () => {
+  const handle = await mount();
+
+  root.loadExtraChargeRules.mockClear();
+  root.loadProcedurePrices.mockClear();
+  root.loadInvoices.mockClear();
+  root.syncInvoiceRoute.mockClear();
+
+  await handle.updateRoute(route('/procedures/rules'));
+
+  expect(root.loadExtraChargeRules).toHaveBeenCalledTimes(1);
+  expect(root.loadProcedurePrices).not.toHaveBeenCalled();
+  expect(root.loadInvoices).not.toHaveBeenCalled();
+  expect(root.syncInvoiceRoute).not.toHaveBeenCalled();
+  expect(root.route().localPath).toBe('/procedures/rules');
 
   await handle.unmount();
 });
