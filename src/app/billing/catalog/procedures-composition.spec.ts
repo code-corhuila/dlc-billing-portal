@@ -4,7 +4,27 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { PricingCatalogService } from './services/pricing-catalog.service';
 import { PricingCatalogComponent } from './pages/pricing-catalog/pricing-catalog.component';
 
-const request = { procedureCode: 'PROC-001', procedureName: 'Demo price', amount: '90000.01', validFrom: '2026-10-12' };
+const request = {
+  procedureCode: 'PROC-001',
+  procedureName: 'Demo price',
+  amount: '90000.01',
+  validFrom: '2026-10-12',
+};
+
+function setupPage() {
+  const injector = Injector.create({
+    providers: [{
+      provide: PricingCatalogService,
+      useValue: new PricingCatalogService(),
+    }],
+  });
+  const page = runInInjectionContext(
+    injector,
+    () => new PricingCatalogComponent(),
+  );
+  return { injector, page };
+}
+
 afterEach(() => vi.useRealTimers());
 
 it('preserves exact decimal prices and rejects noncanonical or nonpositive demo amounts', () => {
@@ -18,62 +38,82 @@ it('preserves exact decimal prices and rejects noncanonical or nonpositive demo 
 
 it('does not open or submit a demo price when the composed UI denies management', () => {
   vi.useFakeTimers();
-  const injector = Injector.create({ providers: [{ provide: PricingCatalogService, useValue: new PricingCatalogService() }] });
+  const { injector, page } = setupPage();
   try {
-    const page = runInInjectionContext(injector, () => new PricingCatalogComponent());
     page.canManagePrices = false;
-    page.openForm(); page.form = { ...request }; page.submitPrice();
+    page.openForm();
+    page.form = { ...request };
+    page.submitPrice();
     expect(page.formVisible()).toBe(false);
     expect(vi.getTimerCount()).toBe(0);
-  } finally { injector.destroy(); }
+  } finally {
+    injector.destroy();
+  }
 });
 
 it('discards a pending demo submission when management is revoked', () => {
   vi.useFakeTimers();
-  const injector = Injector.create({ providers: [{ provide: PricingCatalogService, useValue: new PricingCatalogService() }] });
+  const { injector, page } = setupPage();
   try {
-    const page = runInInjectionContext(injector, () => new PricingCatalogComponent());
-    page.form = { ...request }; page.submitPrice(); page.canManagePrices = false;
+    page.form = { ...request };
+    page.submitPrice();
+    page.canManagePrices = false;
     vi.runAllTimers();
     expect(page.prices()).toHaveLength(3);
     expect(page.submitting()).toBe(false);
-  } finally { injector.destroy(); }
+  } finally {
+    injector.destroy();
+  }
 });
 
 it('snapshots one submission and retains versions across catalog recreation within a mount', () => {
   vi.useFakeTimers();
   const service = new PricingCatalogService();
-  const injector = Injector.create({ providers: [{ provide: PricingCatalogService, useValue: service }] });
+  const injector = Injector.create({
+    providers: [{ provide: PricingCatalogService, useValue: service }],
+  });
   try {
-    const page = runInInjectionContext(injector, () => new PricingCatalogComponent());
-    page.openForPrice(page.prices()[0]); page.form = { ...request }; page.submitPrice(); page.submitPrice();
+    const page = runInInjectionContext(
+      injector,
+      () => new PricingCatalogComponent(),
+    );
+    page.openForPrice(page.prices()[0]);
+    page.form = { ...request };
+    page.submitPrice();
+    page.submitPrice();
     page.form.amount = '1.00';
     vi.runAllTimers();
-    const next = runInInjectionContext(injector, () => new PricingCatalogComponent());
+
+    const next = runInInjectionContext(
+      injector,
+      () => new PricingCatalogComponent(),
+    );
     expect(next.prices().filter(price => price.procedureCode === 'PROC-001')).toHaveLength(2);
-    expect(next.prices()[0]).toMatchObject({ version: 2, amount: '90000.01' });
+    expect(next.prices()[0]).toMatchObject({
+      version: 2,
+      amount: '90000.01',
+    });
     expect(next.formatMoney(next.prices()[0].amount)).toContain('90.000,01');
-  } finally { injector.destroy(); }
+  } finally {
+    injector.destroy();
+  }
 });
 
 it('cancels its pending demo timer on destruction without updating shared catalog data', () => {
   vi.useFakeTimers();
-  const injector = Injector.create({ providers: [{ provide: PricingCatalogService, useValue: new PricingCatalogService() }] });
-  const page = runInInjectionContext(injector, () => new PricingCatalogComponent());
-  page.form = { ...request }; page.submitPrice();
+  const { injector, page } = setupPage();
+  page.form = { ...request };
+  page.submitPrice();
   const writes = vi.spyOn(page.prices, 'set');
-  injector.destroy(); vi.runAllTimers();
+  injector.destroy();
+  vi.runAllTimers();
   expect(writes).not.toHaveBeenCalled();
   expect(vi.getTimerCount()).toBe(0);
 });
 
 it('displays HTTP procedure prices instead of fixtures in composed mode', () => {
-  const injector = Injector.create({
-    providers: [{ provide: PricingCatalogService, useValue: new PricingCatalogService() }],
-  });
-
+  const { injector, page } = setupPage();
   try {
-    const page = runInInjectionContext(injector, () => new PricingCatalogComponent());
     page.composed = true;
     page.httpPrices = [{
       id: 'real-001',
@@ -84,7 +124,7 @@ it('displays HTTP procedure prices instead of fixtures in composed mode', () => 
       status: 'ACTIVE',
       version: 1,
     }];
-page.httpReadStatus = 'success';
+    page.httpReadStatus = 'success';
 
     expect(page.displayedPrices.map(price => price.id)).toEqual(['real-001']);
     expect(page.displayedPrices[0].basePrice).toBe('150000.00');
@@ -94,16 +134,11 @@ page.httpReadStatus = 'success';
 });
 
 it('never falls back to demo prices when the HTTP catalog is empty or fails', () => {
-  const injector = Injector.create({
-    providers: [{ provide: PricingCatalogService, useValue: new PricingCatalogService() }],
-  });
-
+  const { injector, page } = setupPage();
   try {
-    const page = runInInjectionContext(injector, () => new PricingCatalogComponent());
     page.composed = true;
     page.httpPrices = [];
     page.httpReadStatus = 'success';
-
     expect(page.displayedPrices).toEqual([]);
 
     page.httpReadStatus = 'error';
@@ -113,24 +148,96 @@ it('never falls back to demo prices when the HTTP catalog is empty or fails', ()
   }
 });
 
-it('disables simulated price creation in composed mode', () => {
+it('never uses simulated creation in composed mode', () => {
   vi.useFakeTimers();
-  const injector = Injector.create({
-    providers: [{ provide: PricingCatalogService, useValue: new PricingCatalogService() }],
-  });
-
+  const { injector, page } = setupPage();
   try {
-    const page = runInInjectionContext(injector, () => new PricingCatalogComponent());
     page.composed = true;
     page.canManagePrices = true;
 
+    const originalPrices = page.prices();
     page.openForm();
     page.form = { ...request };
     page.submitPrice();
 
-    expect(page.formVisible()).toBe(false);
-    expect(page.submitting()).toBe(false);
+    expect(page.prices()).toEqual(originalPrices);
     expect(vi.getTimerCount()).toBe(0);
+  } finally {
+    injector.destroy();
+  }
+});
+
+it('opens the composed price form only for administrators', () => {
+  const { injector, page } = setupPage();
+  try {
+    page.composed = true;
+    page.canManagePrices = false;
+    page.openForm();
+    expect(page.formVisible()).toBe(false);
+
+    page.canManagePrices = true;
+    page.openForm();
+    expect(page.formVisible()).toBe(true);
+  } finally {
+    injector.destroy();
+  }
+});
+
+it('emits a contract-compatible HTTP creation request without demo timers', () => {
+  vi.useFakeTimers();
+  const { injector, page } = setupPage();
+  try {
+    page.composed = true;
+    page.canManagePrices = true;
+    page.openForm();
+
+    const emitted = vi.fn();
+    page.createPrice.subscribe(emitted);
+
+    page.form = {
+      procedureCode: 'REAL-002',
+      procedureName: 'Consulta odontologica',
+      amount: '95000.01',
+      validFrom: '2026-11-02',
+    };
+
+    page.submitPrice();
+
+    expect(emitted).toHaveBeenCalledExactlyOnceWith({
+      procedureCode: 'REAL-002',
+      name: 'Consulta odontologica',
+      basePrice: '95000.01',
+      validFrom: '2026-11-02T00:00:00Z',
+    });
+    expect(vi.getTimerCount()).toBe(0);
+  } finally {
+    injector.destroy();
+  }
+});
+
+it('does not emit HTTP creation for invalid amounts or revoked permissions', () => {
+  const { injector, page } = setupPage();
+  try {
+    page.composed = true;
+    page.canManagePrices = true;
+    page.openForm();
+
+    const emitted = vi.fn();
+    page.createPrice.subscribe(emitted);
+
+    page.form = {
+      procedureCode: 'REAL-002',
+      procedureName: 'Consulta odontologica',
+      amount: '0.00',
+      validFrom: '2026-11-02',
+    };
+    page.submitPrice();
+
+    page.form.amount = '95000.01';
+    page.canManagePrices = false;
+    page.submitPrice();
+
+    expect(emitted).not.toHaveBeenCalled();
   } finally {
     injector.destroy();
   }
