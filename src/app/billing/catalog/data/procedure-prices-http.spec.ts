@@ -2,6 +2,7 @@ import '@angular/compiler';
 import { expect, it, vi } from 'vitest';
 import type { PortalContext } from '../../../shell-contract';
 import {
+  createProcedurePriceHttp,
   readProcedurePricesHttp,
 } from './procedure-prices-http';
 
@@ -25,6 +26,13 @@ const validPage = {
     total: 1,
     totalPages: 1,
   },
+};
+
+const createRequest = {
+  procedureCode: 'PROC-001',
+  name: 'Limpieza dental',
+  basePrice: '150000.00',
+  validFrom: '2026-11-01T00:00:00Z',
 };
 
 function setup() {
@@ -144,6 +152,109 @@ it('rejects a response received after cancellation', async () => {
     ok: true,
     status: 200,
     data: validPage,
+  });
+
+  await expect(pending).rejects.toThrow();
+});
+
+it('creates a price version using the compositor HTTP client', async () => {
+  const { context, request } = setup();
+
+  request.mockResolvedValue({
+    ok: true,
+    status: 201,
+    data: validPrice,
+  });
+
+  await createProcedurePriceHttp(context, createRequest, 'price-key-001');
+
+  expect(request).toHaveBeenCalledExactlyOnceWith({
+    method: 'POST',
+    path: '/api/v1/procedure-prices',
+    headers: { 'Idempotency-Key': 'price-key-001' },
+    body: createRequest,
+    signal: context.signal,
+  });
+});
+
+it('returns the validated created price version', async () => {
+  const { context, request } = setup();
+
+  request.mockResolvedValue({
+    ok: true,
+    status: 201,
+    data: validPrice,
+  });
+
+  const result = await createProcedurePriceHttp(
+    context,
+    createRequest,
+    'price-key-002',
+  );
+
+  expect(result).toEqual(validPrice);
+});
+
+it('rejects an unsuccessful price creation', async () => {
+  const { context, request } = setup();
+
+  request.mockResolvedValue({
+    ok: false,
+    status: 409,
+    error: 'CONFLICT',
+  });
+
+  await expect(
+    createProcedurePriceHttp(context, createRequest, 'price-key-003'),
+  ).rejects.toThrow();
+});
+
+it('rejects malformed created price responses', async () => {
+  const { context, request } = setup();
+
+  request.mockResolvedValue({
+    ok: true,
+    status: 201,
+    data: { ...validPrice, currency: 'USD' },
+  });
+
+  await expect(
+    createProcedurePriceHttp(context, createRequest, 'price-key-004'),
+  ).rejects.toThrow();
+});
+
+it('does not create prices when already cancelled', async () => {
+  const { context, controller, request } = setup();
+  controller.abort();
+
+  await expect(
+    createProcedurePriceHttp(context, createRequest, 'price-key-005'),
+  ).rejects.toThrow();
+
+  expect(request).not.toHaveBeenCalled();
+});
+
+it('rejects price creation cancelled during the response', async () => {
+  const { context, controller, request } = setup();
+
+  let resolveRequest!: (response: unknown) => void;
+
+  request.mockReturnValue(new Promise(resolve => {
+    resolveRequest = resolve;
+  }));
+
+  const pending = createProcedurePriceHttp(
+    context,
+    createRequest,
+    'price-key-006',
+  );
+
+  controller.abort();
+
+  resolveRequest({
+    ok: true,
+    status: 201,
+    data: validPrice,
   });
 
   await expect(pending).rejects.toThrow();
