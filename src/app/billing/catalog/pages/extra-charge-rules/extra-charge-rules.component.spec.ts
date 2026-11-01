@@ -111,4 +111,52 @@ describe('ExtraChargeRulesComponent HTTP composed mode', () => {
       destroy();
     }
   });
+
+  it('provides HTTP rule details for the composed presentation', () => {
+    const { page, destroy } = createPage();
+
+    try {
+      page.composed = true;
+      page.httpRules = [httpRule];
+      page.httpReadStatus = 'success';
+
+      expect(page.displayedRules).toEqual([httpRule]);
+      expect(page.composedRuleDetails).toEqual([{
+        code: 'REAL-001',
+        itemType: 'ADDITIONAL_MATERIAL',
+        unitPrice: '150000.00',
+        requiresApproval: true,
+        validFrom: '2026-10-01T00:00:00Z',
+        version: 1,
+      }]);
+    } finally {
+      destroy();
+    }
+  });
+
+  it('exposes loading, error and empty HTTP presentation states', () => {
+    const { page, destroy } = createPage();
+
+    try {
+      page.composed = true;
+      page.httpRules = [];
+
+      page.httpReadStatus = 'loading';
+      expect(page.composedReadMessage).toBe(
+        'Cargando reglas adicionales...',
+      );
+
+      page.httpReadStatus = 'error';
+      expect(page.composedReadMessage).toBe(
+        'No fue posible cargar las reglas adicionales.',
+      );
+
+      page.httpReadStatus = 'success';
+      expect(page.composedReadMessage).toBe(
+        'No hay reglas adicionales para mostrar.',
+      );
+    } finally {
+      destroy();
+    }
+  });
 });
