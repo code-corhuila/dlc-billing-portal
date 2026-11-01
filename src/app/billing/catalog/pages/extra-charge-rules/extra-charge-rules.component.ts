@@ -1,8 +1,9 @@
 import { CommonModule } from '@angular/common';
-import { Component, signal } from '@angular/core';
+import { Component, Input, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 
+import type { HttpExtraChargeRule } from '../../data/extra-charge-rules-http';
 import { EXTRA_CHARGE_RULE_FIXTURES } from '../../data/extra-charge-rules.mock';
 import {
   CreateExtraChargeRuleRequest,
@@ -705,6 +706,20 @@ import {
 })
 export class ExtraChargeRulesComponent {
 
+  @Input() composed = false;
+  @Input() httpRules: HttpExtraChargeRule[] = [];
+  @Input() httpReadStatus: 'idle' | 'loading' | 'success' | 'error' = 'idle';
+
+  get displayedRules(): Array<ExtraChargeRule | HttpExtraChargeRule> {
+    if (!this.composed) {
+      return this.rules();
+    }
+
+    return this.httpReadStatus === 'success'
+      ? this.httpRules
+      : [];
+  }
+
   readonly rules = signal<ExtraChargeRule[]>([
     ...EXTRA_CHARGE_RULE_FIXTURES,
   ]);
@@ -766,6 +781,10 @@ export class ExtraChargeRulesComponent {
 
   openForm(): void {
 
+    if (this.composed) {
+      return;
+    }
+
     this.successMessage.set('');
     this.errorMessage.set('');
 
@@ -785,6 +804,10 @@ export class ExtraChargeRulesComponent {
   }
 
   submitRule(): void {
+
+    if (this.composed) {
+      return;
+    }
 
     if (
       this.form.amount === null ||
@@ -890,12 +913,20 @@ export class ExtraChargeRulesComponent {
 
   simulateEmpty(): void {
 
+    if (this.composed) {
+      return;
+    }
+
     this.successMessage.set('');
     this.errorMessage.set('');
     this.rules.set([]);
   }
 
   simulateError(): void {
+
+    if (this.composed) {
+      return;
+    }
 
     this.successMessage.set('');
 
@@ -907,6 +938,10 @@ export class ExtraChargeRulesComponent {
   }
 
   restoreFixtures(): void {
+
+    if (this.composed) {
+      return;
+    }
 
     this.successMessage.set('');
     this.errorMessage.set('');
