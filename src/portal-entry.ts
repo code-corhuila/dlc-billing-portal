@@ -65,17 +65,21 @@ export async function mount(host: HTMLElement, context: PortalContext): Promise<
 
     root.invoiceListMode.set('http');
 
-    const syncRoute = async () => {
-      if (disposed || context.signal.aborted) return;
 
-      if (root.route().localPath === '/') {
-        await root.loadInvoices();
-      } else if (root.route().localPath === '/procedures') {
-        await root.loadProcedurePrices();
-      } else {
-        await root.syncInvoiceRoute();
-      }
-    };
+const syncRoute = async () => {
+  if (disposed || context.signal.aborted) return;
+
+  if (root.route().localPath === '/') {
+    await root.loadInvoices();
+  } else if (root.route().localPath === '/procedures') {
+    await root.loadProcedurePrices();
+  } else if (root.route().localPath === '/procedures/rules') {
+    await root.loadExtraChargeRules();
+  } else {
+    await root.syncInvoiceRoute();
+  }
+};
+
 
     context.signal.addEventListener('abort', onAbort, { once: true });
 
