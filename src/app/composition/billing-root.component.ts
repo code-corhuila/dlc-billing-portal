@@ -133,7 +133,12 @@ export const BILLING_CONTEXT = new InjectionToken<PortalContext>('billing.contex
     [composed]="true"
     [canManagePrices]="canManagePrices()"
     [httpPrices]="procedurePricesReadState().prices"
-    [httpReadStatus]="procedurePricesReadState().status" />
+    [httpReadStatus]="procedurePricesReadState().status"
+    [creatingHttpPrice]="creatingPriceVersion()"
+    (createPrice)="requestPriceVersionCreation($event)" />
+  @if (priceVersionMessage()) {
+    <p role="status">{{ priceVersionMessage() }}</p>
+  }
   } @else if (isExtraChargeRules()) {
     <dlc-extra-charge-rules
       [composed]="true"
@@ -293,6 +298,17 @@ export class BillingCompositionRoot {
     } finally {
       if (!this.isInactive()) this.creatingPriceVersion.set(false);
     }
+  }
+
+  requestPriceVersionCreation(request: CreateHttpProcedurePriceRequest): void {
+    if (
+      this.isInactive()
+      || !this.isProcedures()
+      || !this.canManagePrices()
+      || this.creatingPriceVersion()
+    ) return;
+
+    void this.createPriceVersion(request, crypto.randomUUID());
   }
 
   async loadExtraChargeRules(): Promise<void> {
