@@ -1,6 +1,7 @@
 import '@angular/compiler';
 import {
   Injector,
+  reflectComponentType,
   runInInjectionContext,
 } from '@angular/core';
 import { describe, expect, it, vi } from 'vitest';
@@ -10,6 +11,7 @@ import {
   BillingCompositionRoot,
 } from './billing-root.component';
 import { provideInvoiceListSource } from '../billing/data/invoice-list-source';
+import { ExtraChargeRulesComponent } from '../billing/catalog/pages/extra-charge-rules/extra-charge-rules.component';
 
 const rule = {
   id: '11111111-1111-4111-8111-111111111111',
@@ -224,5 +226,24 @@ describe('extra charge rules composition', () => {
     } finally {
       injector.destroy();
     }
+  });
+
+  it('registers the additional rules presentation in the compositor', () => {
+    const component = reflectComponentType(BillingCompositionRoot);
+
+    expect(component).not.toBeNull();
+    expect(component?.selector).toBeDefined();
+
+    const dependencies = (BillingCompositionRoot as unknown as {
+      ɵcmp: {
+        dependencies?: Array<unknown> | (() => Array<unknown>);
+      };
+    }).ɵcmp.dependencies;
+
+    const registered = typeof dependencies === 'function'
+      ? dependencies()
+      : dependencies ?? [];
+
+    expect(registered).toContain(ExtraChargeRulesComponent);
   });
 });
