@@ -34,6 +34,7 @@ import {
   type InvoiceIssuanceIntent,
 } from '../billing/pages/invoice-detail-http-page.component';
 import { PricingCatalogComponent } from '../billing/catalog/pages/pricing-catalog/pricing-catalog.component';
+import { ExtraChargeRulesComponent } from '../billing/catalog/pages/extra-charge-rules/extra-charge-rules.component';
 import { readProcedurePricesHttp, type HttpProcedurePrice } from '../billing/catalog/data/procedure-prices-http';
 import {
   readExtraChargeRulesHttp,
@@ -53,6 +54,7 @@ export const BILLING_CONTEXT = new InjectionToken<PortalContext>('billing.contex
     InvoiceDetailPageComponent,
     InvoiceDetailHttpPageComponent,
     PricingCatalogComponent,
+    ExtraChargeRulesComponent,
     InvoicePaymentPageComponent,
     InvoicePaymentHttpPageComponent,
     ManualChargeFormComponent,
@@ -127,6 +129,11 @@ export const BILLING_CONTEXT = new InjectionToken<PortalContext>('billing.contex
     [canManagePrices]="canManagePrices()"
     [httpPrices]="procedurePricesReadState().prices"
     [httpReadStatus]="procedurePricesReadState().status" />
+  } @else if (isExtraChargeRules()) {
+    <dlc-extra-charge-rules
+      [composed]="true"
+      [httpRules]="extraChargeRulesReadState().rules"
+      [httpReadStatus]="extraChargeRulesReadState().status" />
   } @else {
     <section aria-label="Billing"><h1 tabindex="-1">{{ title() }}</h1>
       <p role="status">{{ message() }}</p></section>
