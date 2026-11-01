@@ -23,6 +23,13 @@ export interface ProcedurePricePage {
   };
 }
 
+export interface CreateHttpProcedurePriceRequest {
+  procedureCode: string;
+  name: string;
+  basePrice: CopMoney;
+  validFrom: string;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object'
     && value !== null
@@ -163,3 +170,49 @@ export async function readProcedurePricesHttp(
 
   return readProcedurePricePage(result.data);
 }
+
+export async function createProcedurePriceHttp(
+  context: Pick<PortalContext, 'http' | 'signal'>,
+  request: CreateHttpProcedurePriceRequest,
+  idempotencyKey: string,
+): Promise<HttpProcedurePrice> {
+  if (context.signal.aborted) {
+    throw new Error('Procedure price creation cancelled');
+  }
+
+  const body: CreateHttpProcedurePriceRequest = {
+    procedureCode: requireString(
+      request.procedureCode,
+      'procedureCode',
+      80,
+    ),
+    name: requireString(request.name, 'name', 255),
+    basePrice: copMoney(request.basePrice),
+    validFrom: requireTimestamp(request.validFrom, 'validFrom'),
+  };
+
+  if (BigInt(body.basePrice.replace('.', '')) <= 0n) {
+    throw new Error('Invalid procedure price amount');
+  }
+
+  const key = requireString(idempotencyKey, 'idempotencyKey', 255);
+
+  const result = await context.http.request({
+    method: 'POST',
+    path: '/api/v1/procedure-prices',
+    headers: { 'Idempotency-Key': key },
+    body,
+    signal: context.signal,
+  });
+
+  if (context.signal.aborted) {
+    throw new Error('Procedure price creation cancelled');
+  }
+
+  if (!result.ok || result.status !== 201) {
+    throw new Error('Procedure price creation failed');
+  }
+
+  return readProcedurePrice(result.data);
+}
+
