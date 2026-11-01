@@ -35,7 +35,12 @@ import {
 } from '../billing/pages/invoice-detail-http-page.component';
 import { PricingCatalogComponent } from '../billing/catalog/pages/pricing-catalog/pricing-catalog.component';
 import { ExtraChargeRulesComponent } from '../billing/catalog/pages/extra-charge-rules/extra-charge-rules.component';
-import { readProcedurePricesHttp, type HttpProcedurePrice } from '../billing/catalog/data/procedure-prices-http';
+import {
+  createProcedurePriceHttp,
+  readProcedurePricesHttp,
+  type CreateHttpProcedurePriceRequest,
+  type HttpProcedurePrice,
+} from '../billing/catalog/data/procedure-prices-http';
 import {
   readExtraChargeRulesHttp,
   type HttpExtraChargeRule,
@@ -164,6 +169,8 @@ export class BillingCompositionRoot {
     status: 'idle' | 'loading' | 'success' | 'error';
     prices: HttpProcedurePrice[];
   }>({ status: 'idle', prices: [] });
+  readonly creatingPriceVersion = signal(false);
+  readonly priceVersionMessage = signal('');
   readonly extraChargeRulesReadState = signal<{
     status: 'idle' | 'loading' | 'success' | 'error';
     rules: HttpExtraChargeRule[];
@@ -243,6 +250,48 @@ export class BillingCompositionRoot {
       if (this.isInactive() || !this.isProcedures()
         || generation !== this.procedurePricesRequestGeneration) return;
       this.procedurePricesReadState.set({ status: 'error', prices: [] });
+    }
+  }
+
+  async createPriceVersion(
+    request: CreateHttpProcedurePriceRequest,
+    idempotencyKey: string,
+  ): Promise<void> {
+    if (
+      this.isInactive()
+      || !this.isProcedures()
+      || !this.canManagePrices()
+      || this.creatingPriceVersion()
+    ) return;
+
+    const initialRoute = this.route().localPath;
+    const isCurrent = () => !this.isInactive()
+      && this.route().localPath === initialRoute
+      && this.canManagePrices();
+
+    this.priceVersionMessage.set('');
+    this.creatingPriceVersion.set(true);
+
+    try {
+      await createProcedurePriceHttp(this.context, request, idempotencyKey);
+      if (!isCurrent()) return;
+      await this.loadProcedurePrices();
+      if (isCurrent()) {
+        this.priceVersionMessage.set(
+          this.procedurePricesReadState().status === 'success'
+            ? 'Versión de precio registrada correctamente.'
+            : 'Precio registrado, pero no se pudo actualizar el catálogo.',
+        );
+      }
+    } catch {
+      if (isCurrent()) {
+        this.priceVersionMessage.set(
+          'No se pudo registrar la versión de precio. Revise los datos e inténtelo nuevamente.',
+        );
+        this.context.reportFailure?.({ code: 'PORTAL_TASK_FAILED' });
+      }
+    } finally {
+      if (!this.isInactive()) this.creatingPriceVersion.set(false);
     }
   }
 
@@ -359,7 +408,8 @@ export class BillingCompositionRoot {
     const httpSafe = !this.httpPaymentPage()?.dirty && !this.recordingPayment();
     const manualSafe =
       !this.manualChargePage()?.dirty && !this.recordingManualCharge();
-    return catalogSafe && demoSafe && httpSafe && manualSafe;
+    return catalogSafe && demoSafe && httpSafe && manualSafe
+      && !this.creatingPriceVersion();
   }
 
   private readonly invoiceId = computed(() => {
