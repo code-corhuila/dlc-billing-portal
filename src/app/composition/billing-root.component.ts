@@ -28,10 +28,13 @@ import {
   PaymentRegistrationHttpError,
   type RecordPaymentRequest,
 } from '../billing/data/payment-registration-http';
+import { readPaymentHistoryHttp } from '../billing/data/payment-history-http';
 import { InvoiceDetailPageComponent } from '../billing/pages/invoice-detail-page.component';
 import {
   InvoiceDetailHttpPageComponent,
   type InvoiceIssuanceIntent,
+  type PaymentHistoryIntent,
+  type PaymentHistoryViewState,
 } from '../billing/pages/invoice-detail-http-page.component';
 import { PricingCatalogComponent } from '../billing/catalog/pages/pricing-catalog/pricing-catalog.component';
 import { ExtraChargeRulesComponent } from '../billing/catalog/pages/extra-charge-rules/extra-charge-rules.component';
@@ -77,6 +80,9 @@ export const BILLING_CONTEXT = new InjectionToken<PortalContext>('billing.contex
         [canDownloadPdfInvoices]="canDownloadPdfInvoices()"
         [downloadingPdf]="downloadingPdf()"
         [canRecordPayments]="canRecordPayments()"
+        [canReadPaymentHistory]="canReadPaymentHistory()"
+        [paymentHistory]="paymentHistoryState()"
+        (readPaymentHistory)="requestPaymentHistory($event)"
         (issue)="requestInvoiceIssuance($event)"
         (downloadPdf)="requestInvoicePdfDownload($event)"
         (pay)="openPayment($event)"
@@ -170,6 +176,12 @@ export class BillingCompositionRoot {
   readonly session = signal(this.context.session.getSnapshot());
   readonly invoiceReadState = signal(createInvoiceReadState());
   readonly invoiceDetailReadState = signal(createInvoiceDetailReadState());
+  private paymentHistoryGeneration = 0;
+  readonly paymentHistoryState = signal<PaymentHistoryViewState>({
+    status: 'idle',
+    data: [],
+    meta: { page: 1, limit: 20, total: 0, totalPages: 0 },
+  });
   readonly procedurePricesReadState = signal<{
     status: 'idle' | 'loading' | 'success' | 'error';
     prices: HttpProcedurePrice[];
@@ -329,6 +341,45 @@ export class BillingCompositionRoot {
     }
   }
 
+  async requestPaymentHistory(intent: PaymentHistoryIntent): Promise<void> {
+    const invoice = this.displayedInvoiceDetailReadState().invoice;
+    if (
+      this.isInactive() || !this.canReadPaymentHistory()
+      || !invoice || invoice.id !== intent.invoiceId
+      || this.invoiceId() !== intent.invoiceId
+      || this.paymentHistoryState().status === 'loading'
+    ) return;
+
+    const generation = ++this.paymentHistoryGeneration;
+    const empty = { page: intent.page, limit: 20, total: 0, totalPages: 0 };
+    this.paymentHistoryState.set({
+      status: 'loading', invoiceId: intent.invoiceId, data: [], meta: empty,
+    });
+
+    const isCurrent = () => !this.isInactive()
+      && this.canReadPaymentHistory()
+      && this.invoiceId() === intent.invoiceId
+      && generation === this.paymentHistoryGeneration;
+
+    try {
+      const result = await readPaymentHistoryHttp(
+        this.context, intent.invoiceId, intent.page, 20,
+      );
+      if (isCurrent()) {
+        this.paymentHistoryState.set({
+          status: 'success', invoiceId: intent.invoiceId,
+          data: result.data, meta: result.meta,
+        });
+      }
+    } catch {
+      if (isCurrent()) {
+        this.paymentHistoryState.set({
+          status: 'error', invoiceId: intent.invoiceId,
+          data: [], meta: empty,
+        });
+      }
+    }
+  }
   async loadInvoiceDetail(invoiceId: string): Promise<void> {
     if (this.isInactive()) return;
 
@@ -401,6 +452,12 @@ export class BillingCompositionRoot {
     && this.canRecordManualCharges()
     && this.manualChargeContext() !== null
     && !this.recordingManualCharge());
+
+  readonly canReadPaymentHistory = computed(() => this.useHttpInvoiceDetail()
+    && this.session()?.state === 'authenticated'
+    && this.session()?.user?.roles.some(role =>
+      ['ADMINISTRATOR', 'DENTIST', 'SECRETARY_ASSISTANT'].includes(role)
+    ) === true);
 
   readonly canRecordPayments = computed(() => this.session()?.state === 'authenticated'
     && this.session()?.user?.roles.some(role =>
