@@ -14,7 +14,17 @@ const invoice: ReadInvoice = {
   patientId: '22222222-2222-4222-8222-222222222222',
   appointmentId: '33333333-3333-4333-8333-333333333333',
   invoiceNumber: 'INV-2026-001',
-  items: [{ description: 'Unverified procedure' }],
+  items: [{
+    id: '44444444-4444-4444-8444-444444444444',
+    patientId: '22222222-2222-4222-8222-222222222222',
+    procedureId: '55555555-5555-4555-8555-555555555555',
+    description: 'Dental procedure',
+    quantity: '1.2500',
+    unitPrice: copMoney('120000.00'),
+    currency: 'COP',
+    version: 1,
+    status: 'BILLED',
+  }],
   total: copMoney('150000.00'),
   balance: copMoney('75000.00'),
   currency: 'COP',
@@ -353,7 +363,6 @@ it('does not emit payment navigation without a loaded invoice', () => {
   expect(pay).not.toHaveBeenCalled();
 });
 
-
 it('allows authorized payment history access for the selected invoice', () => {
   const page = setup(invoiceDetailReadSuccess(invoice));
   page.canReadPaymentHistory = true;
@@ -457,3 +466,32 @@ it('blocks invalid pagination and requests while loading', () => {
   expect(read).not.toHaveBeenCalled();
 });
 
+it('exposes validated invoice items only after a successful read', () => {
+  const page = setup(invoiceDetailReadSuccess(invoice));
+
+  expect(page.displayedItems).toEqual(invoice.items);
+
+  page.readState = { status: 'loading', invoice: undefined };
+  expect(page.displayedItems).toEqual([]);
+});
+
+it('preserves exact item quantities and formats COP unit prices', () => {
+  const page = setup(invoiceDetailReadSuccess(invoice));
+
+  expect(page.displayedItems[0].quantity).toBe('1.2500');
+  expect(page.formatItemPrice(page.displayedItems[0].unitPrice))
+    .toBe('120.000,00');
+});
+
+it('provides Spanish labels for documented billable item statuses', () => {
+  const page = setup(invoiceDetailReadSuccess(invoice));
+
+  expect(page.itemStatusLabel('BILLED')).toBe('Facturado');
+  expect(page.itemStatusLabel('UNBILLED')).toBe('Pendiente de facturar');
+});
+
+it('returns an empty list when the invoice has no billable items', () => {
+  const page = setup(invoiceDetailReadSuccess({ ...invoice, items: [] }));
+
+  expect(page.displayedItems).toEqual([]);
+});
