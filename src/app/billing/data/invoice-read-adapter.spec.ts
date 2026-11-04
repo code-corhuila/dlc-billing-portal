@@ -13,6 +13,18 @@ describe('invoice read adapter', () => {
     version: 1,
   };
 
+  const validItem = {
+    id: '33333333-3333-4333-8333-333333333333',
+    patientId: validInvoice.patientId,
+    procedureId: '44444444-4444-4444-8444-444444444444',
+    description: 'Dental procedure',
+    quantity: '1.2500',
+    unitPrice: '120000.00',
+    currency: 'COP',
+    version: 1,
+    status: 'BILLED',
+  };
+
   const validPage = {
     data: [validInvoice],
     meta: {
@@ -127,5 +139,65 @@ describe('invoice read adapter', () => {
       ...validInvoice,
       version: 0,
     })).toThrow('Invalid invoice version');
+  });
+
+  it('reads validated billable items with exact decimal values', () => {
+    const result = readInvoiceDetail({
+      ...validInvoice,
+      items: [validItem],
+    });
+
+    expect(result.items).toEqual([validItem]);
+    expect(result.items[0]).toMatchObject({
+      description: 'Dental procedure',
+      quantity: '1.2500',
+      unitPrice: '120000.00',
+      currency: 'COP',
+      status: 'BILLED',
+    });
+  });
+
+  it('rejects billable items without required fields', () => {
+    const { description, ...incompleteItem } = validItem;
+    void description;
+
+    expect(() => readInvoiceDetail({
+      ...validInvoice,
+      items: [incompleteItem],
+    })).toThrow();
+  });
+
+  it('rejects invalid quantities in billable items', () => {
+    for (const quantity of ['0', '-1', '1.12345', 2]) {
+      expect(() => readInvoiceDetail({
+        ...validInvoice,
+        items: [{ ...validItem, quantity }],
+      })).toThrow();
+    }
+  });
+
+  it('rejects invalid billable item prices and currencies', () => {
+    for (const changes of [
+      { unitPrice: 120000 },
+      { unitPrice: 'invalid' },
+      { currency: 'USD' },
+    ]) {
+      expect(() => readInvoiceDetail({
+        ...validInvoice,
+        items: [{ ...validItem, ...changes }],
+      })).toThrow();
+    }
+  });
+
+  it('rejects invalid billable item versions and statuses', () => {
+    for (const changes of [
+      { version: 0 },
+      { status: 'UNKNOWN' },
+    ]) {
+      expect(() => readInvoiceDetail({
+        ...validInvoice,
+        items: [{ ...validItem, ...changes }],
+      })).toThrow();
+    }
   });
 });
