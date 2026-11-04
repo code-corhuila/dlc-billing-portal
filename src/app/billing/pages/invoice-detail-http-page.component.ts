@@ -1,5 +1,9 @@
+
 import { Component, EventEmitter, Input, Output } from '@angular/core';
-import type { ReadInvoice } from '../data/invoice-read-adapter';
+import type {
+  ReadBillableItem,
+  ReadInvoice,
+} from '../data/invoice-read-adapter';
 import {
   createInvoiceDetailReadState,
   type InvoiceDetailReadState,
@@ -58,10 +62,27 @@ const emptyPaymentHistory: PaymentHistoryViewState = {
           <p><strong>Total:</strong> COP {{ formattedTotal }}</p>
           <p><strong>Saldo:</strong> COP {{ formattedBalance }}</p>
 
-          <p role="note">
-            Los conceptos de los cargos no se muestran porque
-            su estructura aún no está validada.
-          </p>
+          <section aria-label="Conceptos facturados">
+            <h3>Conceptos facturados</h3>
+
+            @if (displayedItems.length === 0) {
+              <p role="status">Esta factura no tiene conceptos registrados.</p>
+            } @else {
+              <ul>
+                @for (item of displayedItems; track item.id) {
+                  <li>
+                    <strong>{{ item.description }}</strong>
+                    <p>Cantidad: {{ item.quantity }}</p>
+                    <p>
+                      Precio unitario:
+                      COP {{ formatItemPrice(item.unitPrice) }}
+                    </p>
+                    <p>Estado: {{ itemStatusLabel(item.status) }}</p>
+                  </li>
+                }
+              </ul>
+            }
+          </section>
 
           @if (canIssueInvoices && invoice.status === 'DRAFT') {
             <button type="button" [disabled]="!canIssue"
@@ -160,6 +181,20 @@ export class InvoiceDetailHttpPageComponent {
     return this.readState.status === 'success'
       ? this.readState.invoice
       : undefined;
+  }
+
+  get displayedItems(): ReadBillableItem[] {
+    return this.selectedInvoice?.items ?? [];
+  }
+
+  formatItemPrice(amount: CopMoney): string {
+    return formatCopMoney(amount);
+  }
+
+  itemStatusLabel(status: ReadBillableItem['status']): string {
+    return status === 'BILLED'
+      ? 'Facturado'
+      : 'Pendiente de facturar';
   }
 
   get displayedPaymentHistory(): InvoicePayment[] {
