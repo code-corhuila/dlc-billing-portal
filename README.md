@@ -76,3 +76,25 @@ The Node preview server is for development only; production packaging uses
 [Nginx](deploy/nginx.conf) through the [Dockerfile](deploy/Dockerfile).
 Each build requires a new release directory; set `BILLING_RELEASE` when rebuilding.
 See [release instructions and evidence](docs/composition-release.md).
+
+## Composed additional rule creation
+
+When mounted by the shell, `/procedures/rules` reads and creates additional price
+rules through the shell HTTP client at `/api/v1/additional-price-rules`.
+Administrators can create a rule version using an exact decimal COP string, one
+of the four contracted item types, and a local effective date converted to UTC.
+The form sends `requiresApproval: false`. Secretary assistants have read access.
+The standalone preview still uses its existing fixture catalog.
+
+A pending write blocks duplicate submissions and navigation. An uncertain write
+can be retried with the same in-memory idempotency key for the same actor and
+payload; changed data or another actor gets a new key. The key is not persisted
+across reloads. Confirmed writes close the form and reload the catalog; a failed
+reload does not turn a confirmed write into a failed creation. Responses arriving
+after loss of access, actor changes, or unmount are ignored.
+
+The shell owns authentication, session validation, and HTTP transport. This portal
+does not create or store tokens. Live end-to-end verification requires the Billing
+schema migrations, an operational gateway, and the authorized IAM service
+credential provider. HTTP boundary tests and local builds do not establish that
+those deployed dependencies are available.
