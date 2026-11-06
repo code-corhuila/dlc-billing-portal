@@ -46,6 +46,9 @@ import {
 } from '../billing/catalog/data/procedure-prices-http';
 import {
   readExtraChargeRulesHttp,
+  createExtraChargeRuleHttp,
+  ExtraChargeRuleCreationError,
+  type CreateHttpExtraChargeRuleRequest,
   type HttpExtraChargeRule,
 } from '../billing/catalog/data/extra-charge-rules-http';
 import { DemoInvoicePayments } from '../billing/data/demo-invoice-payments';
@@ -149,7 +152,11 @@ export const BILLING_CONTEXT = new InjectionToken<PortalContext>('billing.contex
     <dlc-extra-charge-rules
       [composed]="true"
       [httpRules]="extraChargeRulesReadState().rules"
-      [httpReadStatus]="extraChargeRulesReadState().status" />
+      [httpReadStatus]="extraChargeRulesReadState().status"
+      [canManageRules]="canManagePrices()" [creatingHttpRule]="creatingExtraChargeRule()"
+      [savedHttpRule]="createdExtraChargeRule()" [creationMessage]="extraChargeRuleMessage()"
+      (createRule)="requestExtraChargeRuleCreation($event)" />
+    @if (extraChargeRuleMessage()) { <p role="status">{{ extraChargeRuleMessage() }}</p> }
   } @else {
     <section aria-label="Billing"><h1 tabindex="-1">{{ title() }}</h1>
       <p role="status">{{ message() }}</p></section>
@@ -186,6 +193,10 @@ export class BillingCompositionRoot {
     status: 'idle' | 'loading' | 'success' | 'error';
     prices: HttpProcedurePrice[];
   }>({ status: 'idle', prices: [] });
+  private extraRuleAttempt?: { actor: string; fingerprint: string; key: string };
+  readonly creatingExtraChargeRule = signal(false);
+  readonly createdExtraChargeRule = signal<HttpExtraChargeRule | null>(null);
+  readonly extraChargeRuleMessage = signal('');
   readonly creatingPriceVersion = signal(false);
   readonly priceVersionMessage = signal('');
   readonly extraChargeRulesReadState = signal<{
@@ -323,21 +334,62 @@ export class BillingCompositionRoot {
     void this.createPriceVersion(request, crypto.randomUUID());
   }
 
+  async requestExtraChargeRuleCreation(request: CreateHttpExtraChargeRuleRequest): Promise<void> {
+    const actor = this.session()?.user?.id;
+    if (!actor || this.isInactive() || !this.isExtraChargeRules()
+      || !this.canManagePrices() || this.creatingExtraChargeRule()) return;
+    const body: CreateHttpExtraChargeRuleRequest = {
+      code: request.code, itemType: request.itemType, unitPrice: request.unitPrice,
+      requiresApproval: request.requiresApproval, validFrom: request.validFrom,
+    };
+    const fingerprint = JSON.stringify(body);
+    if (this.extraRuleAttempt?.actor !== actor || this.extraRuleAttempt.fingerprint !== fingerprint) {
+      this.extraRuleAttempt = { actor, fingerprint, key: crypto.randomUUID() };
+    }
+    const attempt = this.extraRuleAttempt;
+    const isCurrent = () => !this.isInactive() && this.isExtraChargeRules()
+      && this.canManagePrices() && this.session()?.user?.id === actor;
+    this.extraChargeRuleMessage.set('');
+    this.createdExtraChargeRule.set(null);
+    this.creatingExtraChargeRule.set(true);
+    try {
+      const rule = await createExtraChargeRuleHttp(this.context, body, attempt.key);
+      if (!isCurrent()) return;
+      this.extraRuleAttempt = undefined;
+      this.createdExtraChargeRule.set(rule);
+      await this.loadExtraChargeRules();
+      if (isCurrent()) {
+        this.extraChargeRuleMessage.set(this.extraChargeRulesReadState().status === 'success'
+          ? 'Versión de regla registrada correctamente.'
+          : 'Regla registrada, pero no se pudo actualizar el catálogo.');
+      }
+    } catch (error) {
+      if (isCurrent()) {
+        this.extraChargeRuleMessage.set(error instanceof ExtraChargeRuleCreationError && error.status === 409
+          ? 'No se pudo registrar la regla por un conflicto. Revise su código y fecha de vigencia.'
+          : 'No se pudo confirmar el registro. Reintente con los mismos datos.');
+        this.context.reportFailure?.({ code: 'PORTAL_TASK_FAILED' });
+      }
+    } finally {
+      if (!this.isInactive()) this.creatingExtraChargeRule.set(false);
+    }
+  }
+
   async loadExtraChargeRules(): Promise<void> {
-    if (this.isInactive() || !this.isExtraChargeRules()) return;
-
+    const actor = this.session()?.user?.id;
+    const canRead = () => this.session()?.state === 'authenticated'
+      && this.session()?.user?.id === actor
+      && this.session()?.user?.roles.some(role => ['ADMINISTRATOR', 'SECRETARY_ASSISTANT'].includes(role)) === true;
+    if (this.isInactive() || !this.isExtraChargeRules() || !canRead()) return;
     const generation = ++this.extraChargeRulesRequestGeneration;
+    const isCurrent = () => !this.isInactive() && this.isExtraChargeRules() && canRead()
+      && generation === this.extraChargeRulesRequestGeneration;
     this.extraChargeRulesReadState.set({ status: 'loading', rules: [] });
-
     try {
       const result = await readExtraChargeRulesHttp(this.context);
-      if (this.isInactive() || !this.isExtraChargeRules()
-        || generation !== this.extraChargeRulesRequestGeneration) return;
-      this.extraChargeRulesReadState.set({ status: 'success', rules: result.data });
+      if (isCurrent()) this.extraChargeRulesReadState.set({ status: 'success', rules: result.data });
     } catch {
-      if (this.isInactive() || !this.isExtraChargeRules()
-        || generation !== this.extraChargeRulesRequestGeneration) return;
-      this.extraChargeRulesReadState.set({ status: 'error', rules: [] });
+      if (isCurrent()) this.extraChargeRulesReadState.set({ status: 'error', rules: [] });
     }
   }
 
@@ -470,6 +522,7 @@ export class BillingCompositionRoot {
   readonly isProcedures = computed(() => this.route().localPath === '/procedures');
   readonly isExtraChargeRules = computed(() => this.route().localPath === '/procedures/rules');
   readonly catalog = viewChild(PricingCatalogComponent);
+  readonly ruleCatalog = viewChild(ExtraChargeRulesComponent);
   readonly paymentPage = viewChild(InvoicePaymentPageComponent);
   readonly httpPaymentPage = viewChild(InvoicePaymentHttpPageComponent);
   readonly manualChargePage = viewChild(ManualChargeFormComponent);
@@ -482,7 +535,8 @@ export class BillingCompositionRoot {
     const manualSafe =
       !this.manualChargePage()?.dirty && !this.recordingManualCharge();
     return catalogSafe && demoSafe && httpSafe && manualSafe
-      && !this.creatingPriceVersion();
+      && !this.creatingPriceVersion() && !this.creatingExtraChargeRule()
+      && !this.ruleCatalog()?.creationDirty;
   }
 
   private readonly invoiceId = computed(() => {
