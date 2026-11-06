@@ -541,3 +541,38 @@ it('loads additional price rules when navigating to the composed rules route', a
   await handle.unmount();
 });
 
+
+it('starts the composed root in HTTP mode before its first render', async () => {
+  const { BillingCompositionRoot } = await import('./billing-root.component');
+  let observed: { mode: string; invoices: unknown[] } | undefined;
+  app.bootstrap.mockImplementationOnce(() => {
+    const options = vi.mocked(createApplication).mock.calls.at(-1)?.[0];
+    const providers = (options?.providers ?? []).filter(provider =>
+      typeof provider === 'object' && provider !== null && 'provide' in provider);
+    const injector = Injector.create({ providers: providers as any[] });
+    try {
+      const frame = runInInjectionContext(injector, () => new BillingCompositionRoot());
+      observed = { mode: frame.invoiceListMode(), invoices: frame.displayedInvoices() };
+    } finally { injector.destroy(); }
+    return { instance: root };
+  });
+  const handle = await mount();
+  try {
+    expect(observed?.mode).toBe('http');
+    expect(observed?.invoices).toEqual([]);
+  } finally { await handle.unmount(); }
+});
+
+it('refuses standalone invoice data in the composed application', async () => {
+  const { INVOICE_LIST_SOURCE } = await import('../billing/data/invoice-list-source');
+  const handle = await mount();
+  const options = vi.mocked(createApplication).mock.calls.at(-1)?.[0];
+  const providers = (options?.providers ?? []).filter(provider =>
+    typeof provider === 'object' && provider !== null && 'provide' in provider);
+  const injector = Injector.create({ providers: providers as any[] });
+  try {
+    const source = injector.get(INVOICE_LIST_SOURCE);
+    expect(() => source.read()).toThrow('Standalone invoice data is unavailable in HTTP composition');
+    expect(() => source.detail('any-id')).toThrow('Standalone invoice data is unavailable in HTTP composition');
+  } finally { injector.destroy(); await handle.unmount(); }
+});
