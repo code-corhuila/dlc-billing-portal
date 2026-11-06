@@ -176,3 +176,53 @@ export async function readExtraChargeRulesHttp(
 
   return readExtraChargeRulePage(result.data);
 }
+
+export interface CreateHttpExtraChargeRuleRequest {
+  code: string;
+  itemType: ExtraChargeItemType;
+  unitPrice: CopMoney;
+  requiresApproval: false;
+  validFrom: string;
+}
+
+export class ExtraChargeRuleCreationError extends Error {
+  constructor(readonly status: number) {
+    super('Additional rule creation could not be confirmed');
+  }
+}
+
+const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export async function createExtraChargeRuleHttp(
+  context: Pick<PortalContext, 'http' | 'signal'>,
+  request: CreateHttpExtraChargeRuleRequest,
+  idempotencyKey: string,
+): Promise<HttpExtraChargeRule> {
+  if (context.signal.aborted) throw new Error('Additional rule creation cancelled');
+  if (!uuid.test(idempotencyKey) || request.requiresApproval !== false
+    || !['ADDITIONAL_MATERIAL', 'ADDITIONAL_PROCEDURE', 'COMPLEXITY_ADJUSTMENT',
+      'OTHER_AUTHORIZED_CHARGE'].includes(request.itemType)) {
+    throw new Error('Invalid additional rule request');
+  }
+  const body: CreateHttpExtraChargeRuleRequest = {
+    code: requireString(request.code, 'code', 80),
+    itemType: request.itemType,
+    unitPrice: copMoney(request.unitPrice),
+    requiresApproval: false,
+    validFrom: requireTimestamp(request.validFrom, 'validFrom'),
+  };
+  if (BigInt(body.unitPrice.replace('.', '')) <= 0n) throw new Error('Invalid rule amount');
+  const result = await context.http.request({
+    method: 'POST', path: '/api/v1/additional-price-rules',
+    headers: { 'Idempotency-Key': idempotencyKey }, body, signal: context.signal,
+  });
+  if (context.signal.aborted) throw new Error('Additional rule creation cancelled');
+  if (!result.ok || result.status !== 201) throw new ExtraChargeRuleCreationError(result.status);
+  const rule = readExtraChargeRule(result.data);
+  if (!uuid.test(rule.id) || rule.requiresApproval !== false
+    || rule.code !== body.code || rule.itemType !== body.itemType
+    || BigInt(rule.unitPrice.replace('.', '')) !== BigInt(body.unitPrice.replace('.', ''))) {
+    throw new Error('Invalid additional rule creation response');
+  }
+  return rule;
+}
