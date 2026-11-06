@@ -6,7 +6,7 @@ import {
   type RecordManualChargeRequest,
 } from '../billing/data/manual-charge-http';
 import { BillingListPageComponent } from '../billing/pages/billing-list-page.component';
-import { INVOICE_LIST_SOURCE } from '../billing/data/invoice-list-source';
+import { INVOICE_LIST_SOURCE } from '../billing/data/invoice-list-port';
 import { loadInvoiceReadState } from '../billing/data/invoice-read-flow';
 import { createInvoiceReadState } from '../billing/data/invoice-read-state';
 import { loadInvoiceDetailReadState } from '../billing/data/invoice-detail-read-flow';
@@ -56,6 +56,7 @@ import { InvoicePaymentPageComponent } from '../billing/pages/invoice-payment-pa
 import { InvoicePaymentHttpPageComponent } from '../billing/pages/invoice-payment-http-page.component';
 
 export const BILLING_CONTEXT = new InjectionToken<PortalContext>('billing.context');
+export const BILLING_INITIAL_MODE = new InjectionToken<'demo' | 'http'>('billing.initial-mode');
 
 @Component({
   selector: 'dlc-billing-root',
@@ -203,7 +204,8 @@ export class BillingCompositionRoot {
     status: 'idle' | 'loading' | 'success' | 'error';
     rules: HttpExtraChargeRule[];
   }>({ status: 'idle', rules: [] });
-  readonly invoiceListMode = signal<'demo' | 'http'>('demo');
+  readonly invoiceListMode = signal<'demo' | 'http'>(
+    inject(BILLING_INITIAL_MODE, { optional: true }) ?? 'demo');
   readonly issuingInvoice = signal(false);
   readonly issuanceMessage = signal('');
   readonly downloadingPdf = signal(false);
