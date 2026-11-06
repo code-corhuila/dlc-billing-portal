@@ -1,9 +1,10 @@
 import { CommonModule } from '@angular/common';
-import { Component, Input, signal } from '@angular/core';
+import { Component, EventEmitter, Input, Output, signal, ViewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 
-import type { HttpExtraChargeRule } from '../../data/extra-charge-rules-http';
+import type { CreateHttpExtraChargeRuleRequest, HttpExtraChargeRule } from '../../data/extra-charge-rules-http';
+import { ExtraChargeRuleCreateFormComponent } from './extra-charge-rule-create-form.component';
 import { EXTRA_CHARGE_RULE_FIXTURES } from '../../data/extra-charge-rules.mock';
 import {
   CreateExtraChargeRuleRequest,
@@ -18,6 +19,7 @@ import {
     CommonModule,
     FormsModule,
     RouterLink,
+    ExtraChargeRuleCreateFormComponent,
   ],
   template: `
     @if (composed) {
@@ -28,6 +30,9 @@ import {
             <h1>Reglas de cargos adicionales</h1>
             <p class="description">Consulta de reglas registradas en Billing.</p>
           </div>
+          <dlc-extra-charge-rule-create-form [canManageRules]="canManageRules"
+            [creating]="creatingHttpRule" [savedRule]="savedHttpRule" [message]="creationMessage"
+            (createRule)="createRule.emit($event)" />
         </header>
 
         @if (composedReadMessage; as message) {
@@ -754,6 +759,13 @@ import {
 export class ExtraChargeRulesComponent {
 
   @Input() composed = false;
+  @Input() canManageRules = false;
+  @Input() creatingHttpRule = false;
+  @Input() creationMessage = '';
+  @Input() savedHttpRule: HttpExtraChargeRule | null = null;
+  @Output() readonly createRule = new EventEmitter<CreateHttpExtraChargeRuleRequest>();
+  @ViewChild(ExtraChargeRuleCreateFormComponent) creationForm?: ExtraChargeRuleCreateFormComponent;
+  get creationDirty(): boolean { return this.creationForm?.dirty ?? false; }
   @Input() httpRules: HttpExtraChargeRule[] = [];
   @Input() httpReadStatus: 'idle' | 'loading' | 'success' | 'error' = 'idle';
 
