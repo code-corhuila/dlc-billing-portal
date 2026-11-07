@@ -80,6 +80,8 @@ export const BILLING_INITIAL_MODE = new InjectionToken<'demo' | 'http'>('billing
     @if (useHttpInvoiceDetail()) {
       <dlc-invoice-detail-http-page
         [readState]="displayedInvoiceDetailReadState()"
+        [correctionContext]="correctionContext" [canCorrectPrices]="canManagePrices()"
+        (priceCorrected)="loadInvoiceDetail($event)"
         [canIssueInvoices]="canIssueInvoices()"
         [issuing]="issuingInvoice()"
         [canDownloadPdfInvoices]="canDownloadPdfInvoices()"
@@ -166,6 +168,7 @@ export const BILLING_INITIAL_MODE = new InjectionToken<'demo' | 'http'>('billing
 })
 export class BillingCompositionRoot {
   private readonly context = inject(BILLING_CONTEXT);
+  readonly correctionContext=this.context;
   private readonly destroyRef = inject(DestroyRef);
   private navigationGeneration = 0;
   private invoiceRequestGeneration = 0;
@@ -542,6 +545,8 @@ export class BillingCompositionRoot {
   readonly httpPaymentPage = viewChild(InvoicePaymentHttpPageComponent);
   readonly manualChargePage = viewChild(ManualChargeFormComponent);
 
+  readonly correctionDetail=viewChild(InvoiceDetailHttpPageComponent);
+
   canLeave(): boolean {
     const page = this.catalog();
     const catalogSafe = !page || (!page.formVisible() && !page.submitting());
@@ -549,7 +554,7 @@ export class BillingCompositionRoot {
     const httpSafe = !this.httpPaymentPage()?.dirty && !this.recordingPayment();
     const manualSafe =
       !this.manualChargePage()?.dirty && !this.recordingManualCharge();
-    return catalogSafe && demoSafe && httpSafe && manualSafe
+    return !this.correctionDetail()?.correctionDirty && catalogSafe && demoSafe && httpSafe && manualSafe
       && !this.creatingPriceVersion() && !this.creatingExtraChargeRule()
       && !this.ruleCatalog()?.creationDirty;
   }
