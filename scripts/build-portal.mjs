@@ -6,7 +6,7 @@ import { publishRelease } from './release-output.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const { version } = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8'));
-const release = process.env.BILLING_RELEASE ?? `${version}-demo`;
+const release = process.env.BILLING_RELEASE ?? version;
 if (!/^(?!\.+$)[A-Za-z0-9._-]+$/.test(release)) {
   throw new Error('Invalid Billing release');
 }

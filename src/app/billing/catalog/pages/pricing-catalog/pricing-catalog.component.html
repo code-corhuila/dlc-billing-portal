@@ -81,6 +81,11 @@
               <span class="version-badge">Versión {{ price.version }}</span>
               <span>Desde @if (price.validFrom) { <time [attr.datetime]="price.validFrom">{{ price.validFrom }}</time> } @else { No disponible }
                 @if (price.validTo) { · Hasta <time [attr.datetime]="price.validTo">{{ price.validTo }}</time> }</span>
+              @if (canManagePrices) {
+                <button type="button" class="edit-price" [disabled]="!canVersionHttp(price)"
+                  [attr.aria-label]="'Nueva versión de ' + price.name"
+                  (click)="openForHttpPrice(price)">Nueva versión</button>
+              }
             </footer>
           </article></li>
         }
@@ -174,7 +179,7 @@
 
         </div>
 
-        <button type="button" class="icon-button" aria-label="Cerrar formulario" [disabled]="submitting()"
+        <button type="button" class="icon-button" aria-label="Cerrar formulario" [disabled]="submitting() || creatingHttpPrice"
           (click)="closeForm()">
           ×
         </button>
@@ -192,7 +197,7 @@
             </span>
 
             <input type="text" name="procedureCode" [(ngModel)]="form.procedureCode" required
-              [readonly]="editing" [disabled]="submitting()" />
+              [readonly]="editing" [disabled]="submitting() || creatingHttpPrice" />
 
             @if (duplicateCode) { <small class="validation-message">
               Ya existe un procedimiento con este código. Usa el lápiz de su tarjeta para crear una nueva versión.
@@ -207,7 +212,7 @@
             </span>
 
             <input type="text" name="procedureName" [(ngModel)]="form.procedureName" required
-              autofocus [readonly]="editing" [disabled]="submitting()" />
+              autofocus [readonly]="editing" [disabled]="submitting() || creatingHttpPrice" />
 
           </label>
 
@@ -218,7 +223,7 @@
             </span>
 
             <input type="text" inputmode="decimal" name="amount" [(ngModel)]="form.amount" required
-              placeholder="80000.00" [disabled]="submitting()" #amountModel="ngModel" />
+              placeholder="80000.00" [disabled]="submitting() || creatingHttpPrice" #amountModel="ngModel" />
 
             @if (!validAmount && (amountModel.touched || amountModel.dirty)) { <small class="validation-message">
               Usa un precio positivo con dos decimales y punto, por ejemplo 80000.00.
@@ -245,7 +250,7 @@
             </span>
 
             <input type="date" name="validFrom" [(ngModel)]="form.validFrom" required
-              [min]="minValidFrom" [disabled]="submitting()" />
+              [min]="minValidFrom" [disabled]="submitting() || creatingHttpPrice" />
 
             @if (validFromTooEarly) { <small class="validation-message">
               Debe ser posterior al inicio de la versión vigente ({{ minValidFrom }} o después).
@@ -257,17 +262,17 @@
 
         <footer class="modal-actions">
 
-          <button type="button" class="secondary-button" [disabled]="submitting()" (click)="closeForm()">
+          <button type="button" class="secondary-button" [disabled]="submitting() || creatingHttpPrice" (click)="closeForm()">
             Cancelar
           </button>
 
           <button type="submit" class="primary-button" [disabled]="
                 !canManagePrices || priceForm.invalid ||
                 !validAmount || duplicateCode || validFromTooEarly ||
-                submitting()
+                submitting() || creatingHttpPrice
               ">
             {{
-            submitting()
+            (submitting() || creatingHttpPrice)
             ? 'Guardando...'
             : (editing ? 'Guardar nueva versión' : 'Crear procedimiento')
             }}

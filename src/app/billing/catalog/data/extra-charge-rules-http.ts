@@ -1,3 +1,4 @@
+import { pageQuery } from '../../data/pagination';
 import type { PortalContext } from '../../../shell-contract';
 import { copMoney, type CopMoney } from '../../model/cop-money';
 
@@ -155,6 +156,8 @@ export function readExtraChargeRulePage(
 
 export async function readExtraChargeRulesHttp(
   context: Pick<PortalContext, 'http' | 'signal'>,
+  page?: number,
+  limit = 20,
 ): Promise<ExtraChargeRulePage> {
   if (context.signal.aborted) {
     throw new Error('Extra charge rules request cancelled');
@@ -162,7 +165,7 @@ export async function readExtraChargeRulesHttp(
 
   const result = await context.http.request({
     method: 'GET',
-    path: '/api/v1/additional-price-rules',
+    path: `/api/v1/additional-price-rules${page === undefined ? '' : pageQuery(page, limit)}`,
     signal: context.signal,
   });
 

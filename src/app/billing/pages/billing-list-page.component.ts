@@ -1,5 +1,6 @@
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import type { PageMeta } from '../data/pagination';
 import type { InvoiceListItem, InvoiceListStatus } from '../model/invoice-list-item';
 import { copMoney } from '../model/cop-money';
 import { formatCopMoney } from '../presentation/format-cop-money';
@@ -25,7 +26,7 @@ type BillingInvoiceStatusFilter = 'ALL' | InvoiceListStatus;
         </p>
 
         @if (readOnly) {
-          <p role="note">Consulta de facturas en modo de solo lectura. El detalle y los pagos no están disponibles.</p>
+          <p role="note">Consulta las facturas y abre su detalle. Las acciones dependen de tus permisos y del estado de la factura.</p>
         } @else {
           <p role="note">Demostración con datos ficticios. Sin conexión con Billing API.</p>
         }
@@ -187,34 +188,36 @@ type BillingInvoiceStatusFilter = 'ALL' | InvoiceListStatus;
             </p>
           }
 
+        }
           <nav aria-label="Paginación de facturas">
             <button
               type="button"
-              [disabled]="currentPage === 1"
+              [disabled]="(remoteMeta?.page ?? currentPage) <= 1 || isLoading"
               (click)="previousPage()"
             >
               Anterior
             </button>
 
             <span>
-              Página {{ currentPage }} de {{ totalPages }}
+              Página {{ remoteMeta?.page ?? currentPage }} de {{ totalPages }}
             </span>
 
             <button
               type="button"
-              [disabled]="currentPage === totalPages"
+              [disabled]="(remoteMeta?.page ?? currentPage) >= totalPages || isLoading"
               (click)="nextPage()"
             >
               Siguiente
             </button>
           </nav>
         }
-        }
       </section>
     </section>
   `,
 })
 export class BillingListPageComponent {
+  @Input() remoteMeta: PageMeta | null = null;
+  @Output() readonly pageChange = new EventEmitter<number>();
   @Input() composed = false;
   @Input() readOnly = false;
   @Input() canNavigateToInvoice = false;
@@ -311,6 +314,7 @@ export class BillingListPageComponent {
   }
 
   get totalPages(): number {
+    if (this.remoteMeta) return Math.max(1, this.remoteMeta.totalPages);
     return Math.max(
       1,
       Math.ceil(
@@ -320,6 +324,7 @@ export class BillingListPageComponent {
   }
 
   get paginatedInvoices(): InvoiceListItem[] {
+    if (this.remoteMeta) return this.filteredInvoices;
     const startIndex =
       (this.currentPage - 1) * this.pageSize;
 
@@ -353,12 +358,14 @@ export class BillingListPageComponent {
   }
 
   nextPage(): void {
+    if (this.remoteMeta) { this.pageChange.emit(this.remoteMeta.page + 1); return; }
     if (this.currentPage < this.totalPages) {
       this.currentPage += 1;
     }
   }
 
   previousPage(): void {
+    if (this.remoteMeta) { this.pageChange.emit(this.remoteMeta.page - 1); return; }
     if (this.currentPage > 1) {
       this.currentPage -= 1;
     }
