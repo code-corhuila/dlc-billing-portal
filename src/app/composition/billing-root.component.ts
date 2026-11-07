@@ -1,5 +1,6 @@
 import { Component, DestroyRef, InjectionToken, computed, inject, signal, viewChild } from '@angular/core';
-import { PortalContext } from '../shell-contract';
+import { PortalContext, PortalRoute } from '../shell-contract';
+import { manualChargeSource } from '../billing/data/manual-charge-source';
 import { ManualChargeFormComponent } from '../billing/pages/manual-charge-form.component';
 import {
   recordManualChargeHttp,
@@ -131,7 +132,7 @@ export const BILLING_INITIAL_MODE = new InjectionToken<'demo' | 'http'>('billing
       <section aria-label="Cargo manual no disponible">
         <h1>Registro de cargo manual</h1>
         <p role="status">
-          No hay una fuente clínica autorizada seleccionada.
+          No hay una fuente clínica seleccionada.
         </p>
       </section>
     }
@@ -216,7 +217,7 @@ export class BillingCompositionRoot {
     appointmentId: string;
     procedureId: string;
     sourceRecordId: string;
-  }> | null>(null);
+  }> | null>(manualChargeSource(this.context.route));
 
   readonly recordingManualCharge = signal(false);
   readonly manualChargeMessage = signal('');
@@ -245,6 +246,18 @@ export class BillingCompositionRoot {
   }
 
   readonly route = signal(this.context.route);
+  setRoute(route: PortalRoute): void {
+    const next = manualChargeSource(route);
+    const current = this.manualChargeContext();
+    if (current?.patientId !== next?.patientId || current?.appointmentId !== next?.appointmentId
+      || current?.procedureId !== next?.procedureId || current?.sourceRecordId !== next?.sourceRecordId) {
+      this.manualChargePage()?.resetForSource();
+      this.manualChargeContext.set(next);
+      this.manualChargeMessage.set('');
+      this.recordingManualCharge.set(false);
+    }
+    this.route.set(route);
+  }
   readonly payments = new DemoInvoicePayments(this.source);
 
   get invoices() { return this.payments.read(); }
