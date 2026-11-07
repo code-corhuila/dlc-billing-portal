@@ -219,10 +219,10 @@ it('does not allow PDF download by default', () => {
   expect(page.canDownloadPdf).toBe(false);
 });
 
-it('allows an authorized PDF download for an issued invoice', () => {
+it.each(['ISSUED', 'PARTIALLY_PAID', 'PAID'] as const)('allows an authorized PDF download for %s', status => {
   const page = setup(invoiceDetailReadSuccess({
     ...invoice,
-    status: 'ISSUED',
+    status,
   }));
 
   page.canDownloadPdfInvoices = true;
