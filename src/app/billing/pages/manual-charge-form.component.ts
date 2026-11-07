@@ -195,7 +195,10 @@ export class ManualChargeFormComponent {
 
   discard(): void {
     if (this.recording) return;
+    this.resetForSource();
+  }
 
+  resetForSource(): void {
     this.itemType = 'ADDITIONAL_MATERIAL';
     this.concept = '';
     this.quantity = '';
