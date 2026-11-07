@@ -19,7 +19,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-function setup(status: 'DRAFT' | 'ISSUED' = 'ISSUED') {
+function setup(status: 'DRAFT' | 'ISSUED' | 'PARTIALLY_PAID' | 'PAID' = 'ISSUED') {
   const controller = new AbortController();
   const request = vi.fn();
 
@@ -59,7 +59,7 @@ function setup(status: 'DRAFT' | 'ISSUED' = 'ISSUED') {
       patientId: '22222222-2222-4222-8222-222222222222',
       items: [],
       total: '150000.00',
-      balance: '150000.00',
+      balance: status === 'PAID' ? '0.00' : status === 'PARTIALLY_PAID' ? '75000.00' : '150000.00',
       currency: 'COP',
       status,
       version: 3,
@@ -120,8 +120,8 @@ it('does not allow PDF downloads in demo mode', () => {
   }
 });
 
-it('requests the PDF using the documented HTTP contract', async () => {
-  const { frame, injector, request, context } = setup();
+it.each(['ISSUED', 'PARTIALLY_PAID', 'PAID'] as const)('requests the current PDF for %s using the official HTTP contract', async status => {
+  const { frame, injector, request, context } = setup(status);
   const deliver = vi.spyOn(pdfBrowser, 'deliverInvoicePdf')
     .mockImplementation(() => {});
 
