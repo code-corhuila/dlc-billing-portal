@@ -14,6 +14,7 @@ const route = (localPath = '/') => ({
 let controller: AbortController;
 const root = {
   route: signal(route()),
+  setRoute(next: ReturnType<typeof route>): void { root.route.set(next); },
   invoiceListMode: signal<'demo' | 'http'>('demo'),
   loadInvoices: vi.fn().mockResolvedValue(undefined),
   syncInvoiceRoute: vi.fn().mockResolvedValue(undefined),

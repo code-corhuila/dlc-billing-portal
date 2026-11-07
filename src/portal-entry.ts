@@ -94,7 +94,7 @@ const syncRoute = async () => {
       updateRoute: async route => {
         if (disposed) throw new Error('CANCELLED');
 
-        root.route.set(route);
+        root.setRoute(route);
         await syncRoute();
       },
       canLeave: async () => !disposed && root.canLeave(),
