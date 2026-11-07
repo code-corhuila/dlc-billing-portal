@@ -1,5 +1,6 @@
 
 
+import { readPageMeta, type PageMeta } from './pagination';
 import type { PortalContext } from '../../shell-contract';
 import { readInvoicesHttp } from './invoice-http-read';
 import {
@@ -15,6 +16,8 @@ export async function loadInvoiceReadState(
   context: Pick<PortalContext, 'http' | 'signal'>,
   previous: InvoiceReadState,
   onStateChange?: (state: InvoiceReadState) => void,
+  requestedPage?: number,
+  onMeta?: (meta: PageMeta) => void,
 ): Promise<InvoiceReadState> {
   const publish = (state: InvoiceReadState): InvoiceReadState => {
     onStateChange?.(state);
@@ -28,13 +31,15 @@ export async function loadInvoiceReadState(
   const loading = publish(invoiceReadLoading(previous));
 
   try {
-    const page = await readInvoicesHttp(context);
+    const page = await readInvoicesHttp(context, requestedPage);
 
     if (context.signal.aborted) {
       return publish(invoiceReadCancelled(loading));
     }
 
+    const meta = onMeta ? readPageMeta(page.meta) : undefined;
     const invoices = projectInvoiceList(page.data);
+    if (meta) onMeta?.(meta);
 
     return publish(invoiceReadSuccess(invoices));
   } catch {

@@ -1,0 +1,18 @@
+{
+  "release": "2.1.0",
+  "baseCommit": "5255864992277377e828d3bc5e5f5884e4d81553",
+  "workingTreeChanges": true,
+  "entryUrl": "/portals/billing/2.1.0/entry.js",
+  "localArtifactSha256": "252008d0ab46e3d964353b81fe0120853064760297818c7e78aa7f6eb8fd4bf3",
+  "dockerImage": "dlc-billing-portal:audit-2.1.0",
+  "dockerImageId": "sha256:c5b647422752e0ea84272e88bfd19182c1ef6ebaaf6a2ccda1809c8623d9b90c",
+  "dockerArtifactSha256": "8370d6386961480ae4018a489535ce65c5f6d0a710f6d6b10d98fddafd5970e6",
+  "nginxChecks": [
+    "GET 200",
+    "HEAD 200 without body",
+    "Cache-Control no-store",
+    "JavaScript MIME",
+    "missing asset 404"
+  ],
+  "published": false
+}
