@@ -91,7 +91,7 @@ const emptyPaymentHistory: PaymentHistoryViewState = {
             </button>
           }
 
-          @if (canDownloadPdfInvoices && invoice.status === 'ISSUED') {
+          @if (canDownloadPdfInvoices && ['ISSUED', 'PARTIALLY_PAID', 'PAID'].includes(invoice.status)) {
             <button type="button" [disabled]="!canDownloadPdf"
               (click)="requestPdfDownload()">
               {{ downloadingPdf ? 'Descargando PDF...' : 'Descargar PDF' }}
@@ -256,7 +256,7 @@ export class InvoiceDetailHttpPageComponent {
   get canDownloadPdf(): boolean {
     return this.canDownloadPdfInvoices
       && !this.downloadingPdf
-      && this.selectedInvoice?.status === 'ISSUED';
+      && !!this.selectedInvoice && ['ISSUED', 'PARTIALLY_PAID', 'PAID'].includes(this.selectedInvoice.status);
   }
 
   get canPay(): boolean {

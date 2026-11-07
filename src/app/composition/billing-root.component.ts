@@ -753,7 +753,7 @@ export class BillingCompositionRoot {
     if (
       readState.status !== 'success'
       || !invoice
-      || invoice.status !== 'ISSUED'
+      || !['ISSUED', 'PARTIALLY_PAID', 'PAID'].includes(invoice.status)
       || invoice.id !== invoiceId
       || invoice.id !== this.invoiceId()
     ) {
