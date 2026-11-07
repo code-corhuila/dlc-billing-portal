@@ -1,10 +1,10 @@
 {
   "name": "dlc-billing-portal",
-  "version": "0.1.0",
+  "version": "2.1.0",
   "private": true,
   "scripts": {
     "build": "ng build",
-    "contract:check": "node scripts/invoice-contract.mjs --check",
+    "contract:check": "node scripts/invoice-contract.mjs --check && node scripts/billing-operations-contract.mjs --check",
     "build:portal": "node scripts/build-portal.mjs",
     "serve:portal": "node scripts/serve-portal.mjs",
     "start": "ng run dlc-billing-portal:serve-original",

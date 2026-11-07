@@ -46,6 +46,9 @@ export class PricingCatalogComponent {
   @Input() httpPrices: HttpProcedurePrice[] = [];
   @Input() httpReadStatus: CatalogReadStatus = 'idle';
   @Input() creatingHttpPrice = false;
+  @Input() set savedHttpPrice(value: HttpProcedurePrice | null) {
+    if (value) this.resetForSession();
+  }
 
   @Output() readonly createPrice =
     new EventEmitter<CreateHttpProcedurePriceRequest>();
@@ -70,6 +73,29 @@ export class PricingCatalogComponent {
 
   constructor() {
     this.destroyRef.onDestroy(() => clearTimeout(this.pendingTimer));
+  }
+
+  resetForSession(): void {
+    this.formVisible.set(false);
+    this.priceDialog?.nativeElement.close();
+    this.resetForm();
+    this.editing = false;
+    this.clearMessages();
+    this.newPriceButton?.nativeElement.focus();
+  }
+
+  canVersionHttp(price: HttpProcedurePrice): boolean {
+    return this.composed && this.canManagePrices && this.httpReadStatus === 'success'
+      && !this.creatingHttpPrice && !this.httpPrices.some(other =>
+        other.procedureCode === price.procedureCode && other.version > price.version);
+  }
+
+  openForHttpPrice(price: HttpProcedurePrice): void {
+    if (!this.canVersionHttp(price) || this.destroyRef.destroyed) return;
+    this.openForm();
+    this.editing = true;
+    this.form = { procedureCode: price.procedureCode, procedureName: price.name,
+      amount: price.basePrice, validFrom: '' };
   }
 
   get displayedPrices(): HttpProcedurePrice[] {
@@ -149,7 +175,8 @@ export class PricingCatalogComponent {
         .map(price => price.validFrom?.slice(0, 10))
         .filter((date): date is string => !!date);
 
-      return dates.sort().at(-1) ?? '';
+      const latest = dates.sort().at(-1);
+      return latest ? new Date(Date.parse(`${latest}T00:00:00Z`) + 86400000).toISOString().slice(0, 10) : '';
     }
 
     return this.editing

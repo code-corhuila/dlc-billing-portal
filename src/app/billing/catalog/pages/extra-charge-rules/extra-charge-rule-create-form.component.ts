@@ -116,6 +116,7 @@ export class ExtraChargeRuleCreateFormComponent {
       || date.getSeconds() !== Number(parts[6] ?? '0')) return null;
     return date.toISOString();
   }
+  resetForSession(): void { this.resetAndClose(); }
   private resetAndClose(): void {
     this.formVisible.set(false); this.form = this.empty(); this.dialog?.nativeElement.close();
   }
