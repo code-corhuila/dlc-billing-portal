@@ -1,7 +1,8 @@
 import { Component, DestroyRef, EventEmitter, Input, Output, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import type { PortalContext } from '../../shell-contract';
-import { createInvoiceDraftHttp, readUnbilledItemsHttp, isUuid, InvoiceDraftHttpError } from '../data/invoice-draft-http';
+import { createInvoiceDraftHttp, readUnbilledItemsHttp, searchPatientsHttp, isUuid, InvoiceDraftHttpError,
+  type PatientOption } from '../data/invoice-draft-http';
 import type { ReadBillableItem } from '../data/invoice-read-adapter';
 import type { PageMeta } from '../data/pagination';
 import { formatCopMoney } from '../presentation/format-cop-money';
@@ -12,12 +13,22 @@ import { formatCopMoney } from '../presentation/format-cop-money';
     <section aria-label="Crear borrador de factura">
       <h1 tabindex="-1">Crear borrador de factura</h1>
       <p>Selecciona cargos pendientes del paciente. Billing calcula los totales y verifica que la atención esté finalizada administrativamente.</p>
-      <form (ngSubmit)="load(1)">
-        <label>ID del paciente <input name="patientId" [ngModel]="patientId"
-          (ngModelChange)="changePatient($event)" [disabled]="saving || !!createdId" /></label>
+      <form (ngSubmit)="searchPatients(patientQuery)">
+        <label>Buscar paciente <input name="patientQuery" [(ngModel)]="patientQuery"
+          placeholder="Nombre o documento" [disabled]="saving || !!createdId" /></label>
+        <button type="submit" [disabled]="saving || !!createdId || searching">Buscar</button>
+        @if (searching) { <p role="status">Buscando pacientes...</p> }
+        @if (patientResults.length) {
+          <ul aria-label="Pacientes encontrados">
+            @for (option of patientResults; track option.id) {
+              <li><button type="button" (click)="selectPatient(option)">{{ option.label }}</button></li>
+            }
+          </ul>
+        }
+        @if (patientLabel) { <p>Paciente: <strong>{{ patientLabel }}</strong></p> }
         <label>ID de la cita (opcional) <input name="appointmentId" [ngModel]="appointmentId"
           (ngModelChange)="changeAppointment($event)" [disabled]="saving || !!createdId" /></label>
-        <button type="submit" [disabled]="!canCreate || !validPatient || loading || saving || !!createdId">Consultar cargos</button>
+        <button type="button" (click)="load(1)" [disabled]="!canCreate || !validPatient || loading || saving || !!createdId">Consultar cargos</button>
       </form>
       @if (loading) { <p role="status">Consultando cargos...</p> }
       @if (message) { <p role="status">{{ message }}</p> }
@@ -54,6 +65,10 @@ export class InvoiceDraftPageComponent {
   @Input() canCreate = false;
   @Output() readonly created = new EventEmitter<string>();
   patientId = '';
+  patientLabel = '';
+  patientQuery = '';
+  patientResults: PatientOption[] = [];
+  searching = false;
   appointmentId = '';
   items: ReadBillableItem[] = [];
   selected = new Map<string, ReadBillableItem>();
@@ -76,6 +91,28 @@ export class InvoiceDraftPageComponent {
     if (this.saving) return;
     this.resetForSession(); this.patientId = value.trim();
   }
+  async searchPatients(text: string): Promise<void> {
+    const query = text.trim();
+    if (query.length < 2 || this.saving || !this.authorized()) return;
+    const generation = ++this.generation, key = this.accessKey();
+    this.searching = true; this.message = ''; this.patientResults = [];
+    const current = () => this.authorized() && generation === this.generation && key === this.accessKey();
+    try {
+      const options = await searchPatientsHttp(this.context, query);
+      if (current()) {
+        this.patientResults = options;
+        if (!options.length) this.message = 'No se encontraron pacientes activos.';
+      }
+    } catch {
+      if (current()) this.message = 'No fue posible buscar pacientes. Puede reintentar.';
+    } finally { if (generation === this.generation) this.searching = false; }
+  }
+  async selectPatient(option: PatientOption): Promise<void> {
+    if (this.saving || !isUuid(option.id)) return;
+    this.changePatient(option.id);
+    this.patientLabel = option.label;
+    await this.load(1);
+  }
   changeAppointment(value: string): void {
     if (this.saving) return;
     this.appointmentId = value.trim(); this.attempt = undefined;
@@ -87,7 +124,8 @@ export class InvoiceDraftPageComponent {
   }
   resetForSession(): void {
     ++this.generation;
-    this.patientId = ''; this.appointmentId = ''; this.selected.clear(); this.items = [];
+    this.patientId = ''; this.patientLabel = ''; this.patientResults = []; this.searching = false;
+    this.appointmentId = ''; this.selected.clear(); this.items = [];
     this.meta = null; this.loaded = false; this.loading = false; this.message = '';
     this.attempt = undefined; this.createdId = '';
   }
