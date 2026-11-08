@@ -160,7 +160,7 @@ type BillingInvoiceStatusFilter = 'ALL' | InvoiceListStatus;
                   </td>
 
                   <td>
-                    {{ statusLabels[invoice.status] }}
+                    <span class="billing-status" [attr.data-status]="invoice.status">{{ statusLabels[invoice.status] }}</span>
                   </td>
 
                   @if (canOpenInvoice) {

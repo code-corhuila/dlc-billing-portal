@@ -1,6 +1,6 @@
 import { InvoiceDraftPageComponent } from '../billing/pages/invoice-draft-page.component';
 import { readPageMeta, type PageMeta } from '../billing/data/pagination';
-import { Component, DestroyRef, InjectionToken, computed, inject, signal, viewChild } from '@angular/core';
+import { Component, DestroyRef, InjectionToken, ViewEncapsulation, computed, inject, signal, viewChild } from '@angular/core';
 import { PortalContext, PortalRoute } from '../shell-contract';
 import { manualChargeSource } from '../billing/data/manual-charge-source';
 import { ManualChargeFormComponent } from '../billing/pages/manual-charge-form.component';
@@ -64,6 +64,9 @@ export const BILLING_INITIAL_MODE = new InjectionToken<'demo' | 'http'>('billing
 @Component({
   selector: 'dlc-billing-root',
   standalone: true,
+  host: { class: 'dlc-billing' },
+  encapsulation: ViewEncapsulation.None,
+  styleUrl: './billing-theme.css',
   imports: [
     BillingListPageComponent,
     InvoiceDetailPageComponent,
@@ -77,13 +80,13 @@ export const BILLING_INITIAL_MODE = new InjectionToken<'demo' | 'http'>('billing
   ],
   template: `
   @if (invoiceListMode() === 'http') {
-    <nav aria-label="Navegación de facturación">
-      <button type="button" (click)="backToList()">Facturas</button>
+    <nav class="billing-navigation" aria-label="Navegación de facturación">
+      <button type="button" [attr.aria-current]="isInvoiceList() ? 'page' : null" (click)="backToList()">Facturas</button>
       <button type="button" (click)="refreshCurrentRoute()">Actualizar</button>
-      <button type="button" (click)="navigateLocal('/procedures')">Precios</button>
+      <button type="button" [attr.aria-current]="isProcedures() ? 'page' : null" (click)="navigateLocal('/procedures')">Precios</button>
       @if (canRecordPayments()) {
-        <button type="button" (click)="navigateLocal('/procedures/rules')">Reglas adicionales</button>
-        <button type="button" (click)="navigateLocal('/invoices/new')">Crear borrador</button>
+        <button type="button" [attr.aria-current]="isExtraChargeRules() ? 'page' : null" (click)="navigateLocal('/procedures/rules')">Reglas adicionales</button>
+        <button class="billing-primary" type="button" [attr.aria-current]="isDraftRoute() ? 'page' : null" (click)="navigateLocal('/invoices/new')">Crear borrador</button>
       }
     </nav>
   }
