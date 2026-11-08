@@ -2,6 +2,9 @@
 
 The requested changes are published as reviewable pull requests. They are not merged into protected branches or promoted to production.
 
+Follow-up: [connected backend acceptance and demo cleanup](local-backend-acceptance-2026-11-08.md)
+supersedes the interfaces-only limitation below. The dated deployment section is retained as history.
+
 | Repository | Pull request | Target |
 |---|---|---|
 | Billing Portal | https://github.com/code-corhuila/dlc-billing-portal/pull/114 | develop |
