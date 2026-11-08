@@ -41,3 +41,8 @@ docker compose -f .publication/local/compose.json up -d
 - GitHub Actions reported immediate failures for interface PRs without allocating a runner or executing steps (runner_id=0, empty steps, no downloadable job logs). A green remote CI result and independent review are still required. No failing check or branch protection was disabled or bypassed.
 
 The original working directories and unrelated local API/DB changes were preserved. Publication work used isolated worktrees under `.publication/`.
+
+## Final follow-up
+
+- Clinical coverage completed successfully on published source `4380ca9445112a15cafd48893b850ac60226a172`: 354 tests, 97.18% lines, 95.64% statements, 91.95% branches and 97% functions; the two remote packaging tests also passed.
+- The shell incorporated a later develop update for the Patients release. Both appended evidence sections were preserved, both deployment registries retain Billing 2.1.0, 213 tests pass and global formatting passes. The local runtime registry continues selecting the already available interface images, independently of the product registry.
