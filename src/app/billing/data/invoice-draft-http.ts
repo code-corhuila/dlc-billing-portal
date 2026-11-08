@@ -20,7 +20,8 @@ export async function readUnbilledItemsHttp(
 ): Promise<{ data: ReadBillableItem[]; meta: PageMeta }> {
   if (!isUuid(patientId) || context.signal.aborted) throw new Error('Invalid patient or cancelled request');
   const result = await context.http.request({ method: 'GET',
-    path: `/api/v1/billable-items${pageQuery(page)}&patientId=${encodeURIComponent(patientId)}`,
+    path: '/api/v1/billable-items',
+    query: { ...pageQuery(page), patientId: [patientId] },
     signal: context.signal });
   if (context.signal.aborted) throw new Error('Cancelled request');
   if (!result.ok) throw new InvoiceDraftHttpError(result.status);

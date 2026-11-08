@@ -14,6 +14,7 @@ The format follows the principles of Keep a Changelog and Semantic Versioning.
 
 ### Fixed
 
+- Paged reads (invoices, prices, rules, payments) and billable-item lookup send page, limit and patientId as the compositor `query` (C06) instead of inside the path, so "Actualizar", pagination and "Consultar cargos" reach the API.
 - Clear protected data/drafts and reject stale results after identity or permission changes.
 - Preserve price-creation retry keys and close confirmed forms even when catalog reload fails.
 - Align the first-payment minimum at 50% rounded upward to a cent across Portal, Billing API and documentation; retain older payment history.

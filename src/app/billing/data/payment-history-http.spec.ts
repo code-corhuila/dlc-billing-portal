@@ -58,7 +58,8 @@ it('reads authorized invoice payments with contract pagination', async () => {
 
   expect(request).toHaveBeenCalledExactlyOnceWith({
     method: 'GET',
-    path: `/api/v1/invoices/${invoiceId}/payments?page=1&limit=20`,
+    path: `/api/v1/invoices/${invoiceId}/payments`,
+    query: { page: ['1'], limit: ['20'] },
     signal: context.signal,
   });
 
