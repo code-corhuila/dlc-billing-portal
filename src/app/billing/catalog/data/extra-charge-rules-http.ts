@@ -165,7 +165,8 @@ export async function readExtraChargeRulesHttp(
 
   const result = await context.http.request({
     method: 'GET',
-    path: `/api/v1/additional-price-rules${page === undefined ? '' : pageQuery(page, limit)}`,
+    path: '/api/v1/additional-price-rules',
+    ...(page === undefined ? {} : { query: pageQuery(page, limit) }),
     signal: context.signal,
   });
 
