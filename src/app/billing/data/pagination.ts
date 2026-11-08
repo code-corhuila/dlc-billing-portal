@@ -18,9 +18,10 @@ export function readPageMeta(value: unknown): PageMeta {
     total: meta['total'] as number, totalPages: meta['totalPages'] as number };
 }
 
-export function pageQuery(page: number, limit = 20): string {
+/** Page parameters as the compositor `query` (C06); never inside the path. */
+export function pageQuery(page: number, limit = 20): Record<string, readonly string[]> {
   if (!Number.isSafeInteger(page) || page < 1 || !Number.isSafeInteger(limit) || limit < 1 || limit > 100) {
     throw new Error('Invalid pagination request');
   }
-  return `?page=${page}&limit=${limit}`;
+  return { page: [String(page)], limit: [String(limit)] };
 }

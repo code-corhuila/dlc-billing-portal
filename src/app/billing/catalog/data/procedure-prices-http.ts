@@ -159,7 +159,8 @@ export async function readProcedurePricesHttp(
 
   const result = await context.http.request({
     method: 'GET',
-    path: `/api/v1/procedure-prices${page === undefined ? '' : pageQuery(page, limit)}`,
+    path: '/api/v1/procedure-prices',
+    ...(page === undefined ? {} : { query: pageQuery(page, limit) }),
     signal: context.signal,
   });
 

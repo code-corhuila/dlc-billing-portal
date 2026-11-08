@@ -71,12 +71,14 @@ it('loads server pages and retains their authoritative navigation metadata', asy
   try {
     request.mockResolvedValue({ ok: true, data: { data: [invoice], meta } });
     await root.loadInvoices(2);
-    expect(request.mock.calls[0][0].path).toBe('/api/v1/invoices?page=2&limit=20');
+    expect(request.mock.calls[0][0].path).toBe('/api/v1/invoices');
+    expect(request.mock.calls[0][0].query).toEqual({ page: ['2'], limit: ['20'] });
     expect(root.invoiceMeta()).toEqual(meta);
     root.route.set({ ...root.route(), localPath: '/procedures' });
     request.mockResolvedValue({ ok: true, data: { data: [price], meta } });
     await root.loadProcedurePrices(2);
-    expect(request.mock.lastCall?.[0].path).toBe('/api/v1/procedure-prices?page=2&limit=20');
+    expect(request.mock.lastCall?.[0].path).toBe('/api/v1/procedure-prices');
+    expect(request.mock.lastCall?.[0].query).toEqual({ page: ['2'], limit: ['20'] });
     expect(root.priceMeta()).toEqual(meta);
   } finally { injector.destroy(); }
 });
