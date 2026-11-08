@@ -30,7 +30,8 @@ it('reads patient-filtered pages and exposes only pending financial items', asyn
   try {
     request.mockResolvedValue({ ok: true, data: { data: [item, { ...item, id: invoiceId, status: 'BILLED' }], meta } });
     await page.load(1);
-    expect(request.mock.calls[0][0].path).toBe(`/api/v1/billable-items?page=1&limit=20&patientId=${patientId}`);
+    expect(request.mock.calls[0][0].path).toBe('/api/v1/billable-items');
+    expect(request.mock.calls[0][0].query).toEqual({ page: ['1'], limit: ['20'], patientId: [patientId] });
     expect(page.items).toHaveLength(1);
     page.toggle(page.items[0]); expect(page.dirty).toBe(true); expect(page.canSubmit).toBe(true);
   } finally { injector.destroy(); }

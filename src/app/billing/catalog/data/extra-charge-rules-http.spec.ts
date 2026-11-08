@@ -61,6 +61,19 @@ describe('extra charge rules HTTP adapter', () => {
     expect(result).toEqual(page);
   });
 
+  it('sends the requested page as query parameters, not inside the path', async () => {
+    const { context, request } = createContext();
+
+    await readExtraChargeRulesHttp(context, 2);
+
+    expect(request).toHaveBeenCalledWith({
+      method: 'GET',
+      path: '/api/v1/additional-price-rules',
+      query: { page: ['2'], limit: ['20'] },
+      signal: context.signal,
+    });
+  });
+
   it('accepts an empty paginated result', () => {
     const result = readExtraChargeRulePage({
       data: [],
