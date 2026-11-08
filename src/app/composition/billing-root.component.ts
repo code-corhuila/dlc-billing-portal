@@ -1,4 +1,5 @@
 import { InvoiceDraftPageComponent } from '../billing/pages/invoice-draft-page.component';
+import { PendingPricesPageComponent } from '../billing/pages/pending-prices-page.component';
 import { readPageMeta, type PageMeta } from '../billing/data/pagination';
 import { Component, DestroyRef, InjectionToken, ViewEncapsulation, computed, inject, signal, viewChild } from '@angular/core';
 import { PortalContext, PortalRoute } from '../shell-contract';
@@ -68,6 +69,7 @@ export const BILLING_INITIAL_MODE = new InjectionToken<'demo' | 'http'>('billing
   encapsulation: ViewEncapsulation.None,
   styleUrl: './billing-theme.css',
   imports: [
+    PendingPricesPageComponent,
     BillingListPageComponent,
     InvoiceDetailPageComponent,
     InvoiceDetailHttpPageComponent,
@@ -86,6 +88,7 @@ export const BILLING_INITIAL_MODE = new InjectionToken<'demo' | 'http'>('billing
       <button type="button" [attr.aria-current]="isProcedures() ? 'page' : null" (click)="navigateLocal('/procedures')">Precios</button>
       @if (canRecordPayments()) {
         <button type="button" [attr.aria-current]="isExtraChargeRules() ? 'page' : null" (click)="navigateLocal('/procedures/rules')">Reglas adicionales</button>
+        <button type="button" [attr.aria-current]="isPendingPrices() ? 'page' : null" (click)="navigateLocal('/procedures/pending')">Pendientes de precio</button>
         <button class="billing-primary" type="button" [attr.aria-current]="isDraftRoute() ? 'page' : null" (click)="navigateLocal('/invoices/new')">Crear borrador</button>
       }
     </nav>
@@ -199,6 +202,8 @@ export const BILLING_INITIAL_MODE = new InjectionToken<'demo' | 'http'>('billing
       <button type="button" [disabled]="meta.page >= meta.totalPages || creatingExtraChargeRule()" (click)="loadExtraChargeRules(meta.page + 1)">Siguiente</button>
     </nav>
   }
+  } @else if (isPendingPrices() && canRecordPayments()) {
+    <dlc-pending-prices-page #pendingPrices [context]="correctionContext" />
   } @else {
     <section aria-label="Billing"><h1 tabindex="-1">{{ title() }}</h1>
       <p role="status">{{ message() }}</p></section>
@@ -645,6 +650,8 @@ export class BillingCompositionRoot {
     this.isInvoiceList() && this.invoiceListMode() === 'http');
   readonly isProcedures = computed(() => this.route().localPath === '/procedures');
   readonly isExtraChargeRules = computed(() => this.route().localPath === '/procedures/rules');
+  readonly isPendingPrices = computed(() => this.route().localPath === '/procedures/pending');
+  private readonly pendingPrices = viewChild<PendingPricesPageComponent>('pendingPrices');
   readonly isDraftRoute = computed(() => this.invoiceListMode() === 'http' && this.route().localPath === '/invoices/new');
   readonly draftPage = viewChild(InvoiceDraftPageComponent);
   readonly catalog = viewChild(PricingCatalogComponent);
@@ -1052,6 +1059,7 @@ export class BillingCompositionRoot {
     if (this.isInvoiceList()) await this.loadInvoices(this.invoiceMeta()?.page);
     else if (this.isProcedures()) await this.loadProcedurePrices(this.priceMeta()?.page);
     else if (this.isExtraChargeRules()) await this.loadExtraChargeRules(this.ruleMeta()?.page);
+    else if (this.isPendingPrices()) await this.pendingPrices()?.load(this.pendingPrices()?.meta?.page ?? 1);
     else if (this.invoiceId()) await this.loadInvoiceDetail(this.invoiceId()!);
   }
 

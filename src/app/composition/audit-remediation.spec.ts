@@ -142,3 +142,12 @@ it('uses server page controls without slicing the received page again', () => {
   page.nextPage(); page.previousPage();
   expect(emit.mock.calls).toEqual([[3], [1]]);
 });
+
+it('recognizes the pending-price route for staff who manage charges', () => {
+  const { root, injector } = setup('/procedures/pending');
+  try {
+    expect(root.isPendingPrices()).toBe(true);
+    expect(root.canRecordPayments()).toBe(true);
+    expect(root.isProcedures()).toBe(false);
+  } finally { injector.destroy(); }
+});
