@@ -112,3 +112,37 @@ it('keeps selection for conflict review and denies unauthorized creation', async
     page.canCreate = false; await page.submit(); expect(request).toHaveBeenCalledTimes(1);
   } finally { injector.destroy(); }
 });
+
+it('finds the patient by name or document instead of asking for the raw identifier', async () => {
+  const { page, request, injector } = setup();
+  try {
+    page.resetForSession();
+    request.mockResolvedValueOnce({ ok: true, data: { data: [
+      { id: patientId, name: 'Laura Front', documentType: 'CC', documentNumber: '1075000003', status: 'ACTIVE', version: 1 },
+    ], meta } });
+    await page.searchPatients('  laura ');
+    expect(request.mock.calls[0][0]).toMatchObject({ method: 'GET', path: '/api/v1/patients',
+      query: { search: ['laura'], status: ['ACTIVE'], page: ['1'], limit: ['10'] } });
+    expect(page.patientResults).toEqual([{ id: patientId, label: 'Laura Front — CC 1075000003' }]);
+
+    request.mockResolvedValueOnce({ ok: true, data: { data: [item], meta } });
+    await page.selectPatient(page.patientResults[0]);
+    expect(page.patientId).toBe(patientId);
+    expect(page.patientLabel).toBe('Laura Front — CC 1075000003');
+    expect(page.patientResults).toEqual([]);
+    expect(request.mock.calls[1][0].query).toEqual({ page: ['1'], limit: ['20'], patientId: [patientId] });
+    expect(page.items).toHaveLength(1);
+  } finally { injector.destroy(); }
+});
+
+it('needs two characters to search and reports a failed search', async () => {
+  const { page, request, injector } = setup();
+  try {
+    await page.searchPatients('l');
+    expect(request).not.toHaveBeenCalled();
+    request.mockResolvedValueOnce({ ok: false, status: 503 });
+    await page.searchPatients('laura');
+    expect(page.patientResults).toEqual([]);
+    expect(page.message).toBe('No fue posible buscar pacientes. Puede reintentar.');
+  } finally { injector.destroy(); }
+});
