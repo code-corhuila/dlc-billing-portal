@@ -1,5 +1,7 @@
+import type { PortalContext } from '../../shell-contract';
+import { PriceCorrectionFormComponent } from './price-correction-form.component';
 
-import { Component, EventEmitter, Input, Output } from '@angular/core';
+import { Component, EventEmitter, Input, Output, QueryList, ViewChildren } from '@angular/core';
 import type {
   ReadBillableItem,
   ReadInvoice,
@@ -41,6 +43,7 @@ const emptyPaymentHistory: PaymentHistoryViewState = {
 @Component({
   selector: 'dlc-invoice-detail-http-page',
   standalone: true,
+  imports: [PriceCorrectionFormComponent],
   template: `
     <section aria-label="Detalle de factura">
       <button type="button" (click)="back.emit()">Volver a facturas</button>
@@ -78,6 +81,11 @@ const emptyPaymentHistory: PaymentHistoryViewState = {
                       COP {{ formatItemPrice(item.unitPrice) }}
                     </p>
                     <p>Estado: {{ itemStatusLabel(item.status) }}</p>
+                    @if (invoice.status === 'DRAFT' && item.approvalRequired) {
+                      <p>Este cargo tiene una corrección administrativa pendiente.</p>
+                      <dlc-price-correction-form [context]="correctionContext" [item]="item"
+                        [canCorrect]="canCorrectPrices" (corrected)="priceCorrected.emit(invoice.id)" />
+                    }
                   </li>
                 }
               </ul>
@@ -91,7 +99,7 @@ const emptyPaymentHistory: PaymentHistoryViewState = {
             </button>
           }
 
-          @if (canDownloadPdfInvoices && invoice.status === 'ISSUED') {
+          @if (canDownloadPdfInvoices && ['ISSUED', 'PARTIALLY_PAID', 'PAID'].includes(invoice.status)) {
             <button type="button" [disabled]="!canDownloadPdf"
               (click)="requestPdfDownload()">
               {{ downloadingPdf ? 'Descargando PDF...' : 'Descargar PDF' }}
@@ -161,6 +169,11 @@ const emptyPaymentHistory: PaymentHistoryViewState = {
   `,
 })
 export class InvoiceDetailHttpPageComponent {
+  @Input() correctionContext?: PortalContext;
+  @Input() canCorrectPrices=false;
+  @Output() readonly priceCorrected=new EventEmitter<string>();
+  @ViewChildren(PriceCorrectionFormComponent) correctionForms?: QueryList<PriceCorrectionFormComponent>;
+  get correctionDirty(): boolean { return this.correctionForms?.some(form=>form.dirty) ?? false; }
   @Input() readState: InvoiceDetailReadState = createInvoiceDetailReadState();
   @Input() canIssueInvoices = false;
   @Input() issuing = false;
@@ -248,7 +261,7 @@ export class InvoiceDetailHttpPageComponent {
   }
 
   get canIssue(): boolean {
-    return this.canIssueInvoices
+    return !this.correctionDirty && !this.displayedItems.some(item => item.approvalRequired) && this.canIssueInvoices
       && !this.issuing
       && this.selectedInvoice?.status === 'DRAFT';
   }
@@ -256,7 +269,7 @@ export class InvoiceDetailHttpPageComponent {
   get canDownloadPdf(): boolean {
     return this.canDownloadPdfInvoices
       && !this.downloadingPdf
-      && this.selectedInvoice?.status === 'ISSUED';
+      && !!this.selectedInvoice && ['ISSUED', 'PARTIALLY_PAID', 'PAID'].includes(this.selectedInvoice.status);
   }
 
   get canPay(): boolean {

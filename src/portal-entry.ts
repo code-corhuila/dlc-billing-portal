@@ -1,8 +1,12 @@
 import { ApplicationRef, ErrorHandler, provideZonelessChangeDetection } from '@angular/core';
 import { createApplication } from '@angular/platform-browser';
-import { BILLING_CONTEXT, BillingCompositionRoot } from './app/composition/billing-root.component';
+import { BILLING_CONTEXT, BILLING_INITIAL_MODE, BillingCompositionRoot } from './app/composition/billing-root.component';
 import { PortalContext, PortalHandle } from './app/shell-contract';
-import { provideInvoiceListSource } from './app/billing/data/invoice-list-source';
+import { INVOICE_LIST_SOURCE } from './app/billing/data/invoice-list-port';
+
+const refuseStandaloneInvoices = (): never => {
+  throw new Error('Standalone invoice data is unavailable in HTTP composition');
+};
 
 export const portalId = 'billing';
 export const contractVersion = 1;
@@ -44,7 +48,8 @@ export async function mount(host: HTMLElement, context: PortalContext): Promise<
     application = await createApplication({
       providers: [
         provideZonelessChangeDetection(),
-        provideInvoiceListSource(),
+        { provide: BILLING_INITIAL_MODE, useValue: 'http' },
+        { provide: INVOICE_LIST_SOURCE, useValue: { read: refuseStandaloneInvoices, detail: refuseStandaloneInvoices } },
         { provide: BILLING_CONTEXT, useValue: context },
         {
           provide: ErrorHandler,
@@ -89,7 +94,7 @@ const syncRoute = async () => {
       updateRoute: async route => {
         if (disposed) throw new Error('CANCELLED');
 
-        root.route.set(route);
+        root.setRoute(route);
         await syncRoute();
       },
       canLeave: async () => !disposed && root.canLeave(),

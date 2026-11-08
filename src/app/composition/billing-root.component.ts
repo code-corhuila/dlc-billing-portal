@@ -1,12 +1,15 @@
-import { Component, DestroyRef, InjectionToken, computed, inject, signal, viewChild } from '@angular/core';
-import { PortalContext } from '../shell-contract';
+import { InvoiceDraftPageComponent } from '../billing/pages/invoice-draft-page.component';
+import { readPageMeta, type PageMeta } from '../billing/data/pagination';
+import { Component, DestroyRef, InjectionToken, ViewEncapsulation, computed, inject, signal, viewChild } from '@angular/core';
+import { PortalContext, PortalRoute } from '../shell-contract';
+import { manualChargeSource } from '../billing/data/manual-charge-source';
 import { ManualChargeFormComponent } from '../billing/pages/manual-charge-form.component';
 import {
   recordManualChargeHttp,
   type RecordManualChargeRequest,
 } from '../billing/data/manual-charge-http';
 import { BillingListPageComponent } from '../billing/pages/billing-list-page.component';
-import { INVOICE_LIST_SOURCE } from '../billing/data/invoice-list-source';
+import { INVOICE_LIST_SOURCE } from '../billing/data/invoice-list-port';
 import { loadInvoiceReadState } from '../billing/data/invoice-read-flow';
 import { createInvoiceReadState } from '../billing/data/invoice-read-state';
 import { loadInvoiceDetailReadState } from '../billing/data/invoice-detail-read-flow';
@@ -46,6 +49,9 @@ import {
 } from '../billing/catalog/data/procedure-prices-http';
 import {
   readExtraChargeRulesHttp,
+  createExtraChargeRuleHttp,
+  ExtraChargeRuleCreationError,
+  type CreateHttpExtraChargeRuleRequest,
   type HttpExtraChargeRule,
 } from '../billing/catalog/data/extra-charge-rules-http';
 import { DemoInvoicePayments } from '../billing/data/demo-invoice-payments';
@@ -53,10 +59,14 @@ import { InvoicePaymentPageComponent } from '../billing/pages/invoice-payment-pa
 import { InvoicePaymentHttpPageComponent } from '../billing/pages/invoice-payment-http-page.component';
 
 export const BILLING_CONTEXT = new InjectionToken<PortalContext>('billing.context');
+export const BILLING_INITIAL_MODE = new InjectionToken<'demo' | 'http'>('billing.initial-mode');
 
 @Component({
   selector: 'dlc-billing-root',
   standalone: true,
+  host: { class: 'dlc-billing' },
+  encapsulation: ViewEncapsulation.None,
+  styleUrl: './billing-theme.css',
   imports: [
     BillingListPageComponent,
     InvoiceDetailPageComponent,
@@ -66,15 +76,34 @@ export const BILLING_CONTEXT = new InjectionToken<PortalContext>('billing.contex
     InvoicePaymentPageComponent,
     InvoicePaymentHttpPageComponent,
     ManualChargeFormComponent,
+    InvoiceDraftPageComponent,
   ],
-  template: `@if (isInvoiceList()) {
+  template: `
+  @if (invoiceListMode() === 'http') {
+    <nav class="billing-navigation" aria-label="Navegación de facturación">
+      <button type="button" [attr.aria-current]="isInvoiceList() ? 'page' : null" (click)="backToList()">Facturas</button>
+      <button type="button" (click)="refreshCurrentRoute()">Actualizar</button>
+      <button type="button" [attr.aria-current]="isProcedures() ? 'page' : null" (click)="navigateLocal('/procedures')">Precios</button>
+      @if (canRecordPayments()) {
+        <button type="button" [attr.aria-current]="isExtraChargeRules() ? 'page' : null" (click)="navigateLocal('/procedures/rules')">Reglas adicionales</button>
+        <button class="billing-primary" type="button" [attr.aria-current]="isDraftRoute() ? 'page' : null" (click)="navigateLocal('/invoices/new')">Crear borrador</button>
+      }
+    </nav>
+  }
+  @if (isDraftRoute()) {
+    <dlc-invoice-draft-page [context]="correctionContext" [canCreate]="canRecordPayments()"
+      (created)="openInvoice($event)" />
+  } @else if (isInvoiceList()) {
     <dlc-billing-list-page [composed]="true" [readOnly]="invoiceListMode() === 'http'"
       [canNavigateToInvoice]="canNavigateHttpInvoices()" [readStatus]="displayedReadStatus()" [invoices]="displayedInvoices()"
+      [remoteMeta]="invoiceMeta()" (pageChange)="loadInvoices($event)"
       (openInvoice)="openInvoice($event)" />
   } @else if (isInvoiceDetail()) {
     @if (useHttpInvoiceDetail()) {
       <dlc-invoice-detail-http-page
         [readState]="displayedInvoiceDetailReadState()"
+        [correctionContext]="correctionContext" [canCorrectPrices]="canManagePrices()"
+        (priceCorrected)="loadInvoiceDetail($event)"
         [canIssueInvoices]="canIssueInvoices()"
         [issuing]="issuingInvoice()"
         [canDownloadPdfInvoices]="canDownloadPdfInvoices()"
@@ -127,7 +156,7 @@ export const BILLING_CONTEXT = new InjectionToken<PortalContext>('billing.contex
       <section aria-label="Cargo manual no disponible">
         <h1>Registro de cargo manual</h1>
         <p role="status">
-          No hay una fuente clínica autorizada seleccionada.
+          No hay una fuente clínica seleccionada.
         </p>
       </section>
     }
@@ -140,16 +169,36 @@ export const BILLING_CONTEXT = new InjectionToken<PortalContext>('billing.contex
     [canManagePrices]="canManagePrices()"
     [httpPrices]="procedurePricesReadState().prices"
     [httpReadStatus]="procedurePricesReadState().status"
-    [creatingHttpPrice]="creatingPriceVersion()"
+    [creatingHttpPrice]="creatingPriceVersion()" [savedHttpPrice]="createdPrice()"
     (createPrice)="requestPriceVersionCreation($event)" />
   @if (priceVersionMessage()) {
     <p role="status">{{ priceVersionMessage() }}</p>
+  }
+  @if (priceMeta(); as meta) {
+    <nav aria-label="Paginación del catálogo">
+      <p>La búsqueda se aplica a esta página del catálogo.</p>
+      <button type="button" [disabled]="meta.page <= 1 || creatingPriceVersion()" (click)="loadProcedurePrices(meta.page - 1)">Anterior</button>
+      <span>Página {{ meta.page }} de {{ meta.totalPages || 1 }}</span>
+      <button type="button" [disabled]="meta.page >= meta.totalPages || creatingPriceVersion()" (click)="loadProcedurePrices(meta.page + 1)">Siguiente</button>
+    </nav>
   }
   } @else if (isExtraChargeRules()) {
     <dlc-extra-charge-rules
       [composed]="true"
       [httpRules]="extraChargeRulesReadState().rules"
-      [httpReadStatus]="extraChargeRulesReadState().status" />
+      [httpReadStatus]="extraChargeRulesReadState().status"
+      [canManageRules]="canManagePrices()" [creatingHttpRule]="creatingExtraChargeRule()"
+      [savedHttpRule]="createdExtraChargeRule()" [creationMessage]="extraChargeRuleMessage()"
+      (createRule)="requestExtraChargeRuleCreation($event)" />
+    @if (extraChargeRuleMessage()) { <p role="status">{{ extraChargeRuleMessage() }}</p> }
+  @if (ruleMeta(); as meta) {
+    <nav aria-label="Paginación del catálogo">
+      <p>La búsqueda se aplica a esta página del catálogo.</p>
+      <button type="button" [disabled]="meta.page <= 1 || creatingExtraChargeRule()" (click)="loadExtraChargeRules(meta.page - 1)">Anterior</button>
+      <span>Página {{ meta.page }} de {{ meta.totalPages || 1 }}</span>
+      <button type="button" [disabled]="meta.page >= meta.totalPages || creatingExtraChargeRule()" (click)="loadExtraChargeRules(meta.page + 1)">Siguiente</button>
+    </nav>
+  }
   } @else {
     <section aria-label="Billing"><h1 tabindex="-1">{{ title() }}</h1>
       <p role="status">{{ message() }}</p></section>
@@ -157,6 +206,53 @@ export const BILLING_CONTEXT = new InjectionToken<PortalContext>('billing.contex
 })
 export class BillingCompositionRoot {
   private readonly context = inject(BILLING_CONTEXT);
+  readonly correctionContext=this.context;
+  private securityGeneration = 0;
+  private securityKey(): string {
+    const snapshot = this.session();
+    return JSON.stringify([snapshot?.state, snapshot?.user?.id, snapshot?.user?.roles,
+      snapshot?.permissions]);
+  }
+  private captureAccess(): () => boolean {
+    const generation = this.securityGeneration;
+    const key = this.securityKey();
+    return () => !this.isInactive() && generation === this.securityGeneration && key === this.securityKey();
+  }
+  private clearProtectedState(): void {
+    ++this.securityGeneration;
+    ++this.invoiceRequestGeneration;
+    ++this.invoiceDetailRequestGeneration;
+    ++this.procedurePricesRequestGeneration;
+    ++this.extraChargeRulesRequestGeneration;
+    ++this.paymentHistoryGeneration;
+    this.pendingDetailId = undefined;
+    this.pendingDetailLoad = undefined;
+    this.loadedDetailId = undefined;
+    this.issuanceAttempt = undefined;
+    this.priceAttempt = undefined;
+    this.extraRuleAttempt = undefined;
+    this.invoiceReadState.set(createInvoiceReadState());
+    this.invoiceDetailReadState.set(createInvoiceDetailReadState());
+    this.invoiceMeta.set(null); this.priceMeta.set(null); this.ruleMeta.set(null);
+    this.procedurePricesReadState.set({ status: 'idle', prices: [] });
+    this.extraChargeRulesReadState.set({ status: 'idle', rules: [] });
+    this.paymentHistoryState.set({ status: 'idle', data: [], meta: { page: 1, limit: 20, total: 0, totalPages: 0 } });
+    this.createdPrice.set(null); this.createdExtraChargeRule.set(null);
+    this.priceVersionMessage.set(''); this.extraChargeRuleMessage.set('');
+    this.issuanceMessage.set(''); this.pdfDownloadMessage.set('');
+    this.paymentRegistrationMessage.set(''); this.manualChargeMessage.set('');
+    this.catalog()?.resetForSession();
+    this.ruleCatalog()?.creationForm?.resetForSession();
+    this.httpPaymentPage()?.resetForSession();
+    this.manualChargePage()?.resetForSource();
+    this.draftPage()?.resetForSession();
+  }
+  readonly invoiceMeta = signal<PageMeta | null>(null);
+  readonly priceMeta = signal<PageMeta | null>(null);
+  readonly ruleMeta = signal<PageMeta | null>(null);
+  readonly createdPrice = signal<HttpProcedurePrice | null>(null);
+  private priceAttempt?: { fingerprint: string; key: string };
+
   private readonly destroyRef = inject(DestroyRef);
   private navigationGeneration = 0;
   private invoiceRequestGeneration = 0;
@@ -186,13 +282,18 @@ export class BillingCompositionRoot {
     status: 'idle' | 'loading' | 'success' | 'error';
     prices: HttpProcedurePrice[];
   }>({ status: 'idle', prices: [] });
+  private extraRuleAttempt?: { actor: string; fingerprint: string; key: string };
+  readonly creatingExtraChargeRule = signal(false);
+  readonly createdExtraChargeRule = signal<HttpExtraChargeRule | null>(null);
+  readonly extraChargeRuleMessage = signal('');
   readonly creatingPriceVersion = signal(false);
   readonly priceVersionMessage = signal('');
   readonly extraChargeRulesReadState = signal<{
     status: 'idle' | 'loading' | 'success' | 'error';
     rules: HttpExtraChargeRule[];
   }>({ status: 'idle', rules: [] });
-  readonly invoiceListMode = signal<'demo' | 'http'>('demo');
+  readonly invoiceListMode = signal<'demo' | 'http'>(
+    inject(BILLING_INITIAL_MODE, { optional: true }) ?? 'demo');
   readonly issuingInvoice = signal(false);
   readonly issuanceMessage = signal('');
   readonly downloadingPdf = signal(false);
@@ -203,7 +304,7 @@ export class BillingCompositionRoot {
     appointmentId: string;
     procedureId: string;
     sourceRecordId: string;
-  }> | null>(null);
+  }> | null>(manualChargeSource(this.context.route));
 
   readonly recordingManualCharge = signal(false);
   readonly manualChargeMessage = signal('');
@@ -227,17 +328,32 @@ export class BillingCompositionRoot {
 
   constructor() {
     this.destroyRef.onDestroy(this.context.session.subscribe(snapshot => {
-      if (!this.isInactive()) this.session.set(snapshot);
+      if (this.isInactive()) return;
+      const previous = this.securityKey();
+      this.session.set(snapshot);
+      if (previous !== this.securityKey()) this.clearProtectedState();
     }));
   }
 
   readonly route = signal(this.context.route);
+  setRoute(route: PortalRoute): void {
+    const next = manualChargeSource(route);
+    const current = this.manualChargeContext();
+    if (current?.patientId !== next?.patientId || current?.appointmentId !== next?.appointmentId
+      || current?.procedureId !== next?.procedureId || current?.sourceRecordId !== next?.sourceRecordId) {
+      this.manualChargePage()?.resetForSource();
+      this.manualChargeContext.set(next);
+      this.manualChargeMessage.set('');
+    }
+    this.route.set(route);
+  }
   readonly payments = new DemoInvoicePayments(this.source);
 
   get invoices() { return this.payments.read(); }
 
-  async loadInvoices(): Promise<void> {
-    if (this.isInactive()) return;
+  async loadInvoices(page?: number): Promise<void> {
+    const accessCurrent = this.captureAccess();
+    if (!accessCurrent()) return;
 
     const generation = ++this.invoiceRequestGeneration;
 
@@ -245,26 +361,30 @@ export class BillingCompositionRoot {
       this.context,
       this.invoiceReadState(),
       state => {
-        if (!this.isInactive() && generation === this.invoiceRequestGeneration) {
+        if (accessCurrent() && generation === this.invoiceRequestGeneration) {
           this.invoiceReadState.set(state);
         }
       },
+      page,
+      meta => { if (accessCurrent() && generation === this.invoiceRequestGeneration) this.invoiceMeta.set(meta); },
     );
   }
 
-  async loadProcedurePrices(): Promise<void> {
-    if (this.isInactive() || !this.isProcedures()) return;
+  async loadProcedurePrices(page?: number): Promise<void> {
+    const accessCurrent = this.captureAccess();
+    if (!accessCurrent() || !this.isProcedures()) return;
 
     const generation = ++this.procedurePricesRequestGeneration;
     this.procedurePricesReadState.set({ status: 'loading', prices: [] });
 
     try {
-      const result = await readProcedurePricesHttp(this.context);
-      if (this.isInactive() || !this.isProcedures()
+      const result = await readProcedurePricesHttp(this.context, page);
+      if (!accessCurrent() || !this.isProcedures()
         || generation !== this.procedurePricesRequestGeneration) return;
+      this.priceMeta.set(readPageMeta(result.meta));
       this.procedurePricesReadState.set({ status: 'success', prices: result.data });
     } catch {
-      if (this.isInactive() || !this.isProcedures()
+      if (!accessCurrent() || !this.isProcedures()
         || generation !== this.procedurePricesRequestGeneration) return;
       this.procedurePricesReadState.set({ status: 'error', prices: [] });
     }
@@ -274,15 +394,16 @@ export class BillingCompositionRoot {
     request: CreateHttpProcedurePriceRequest,
     idempotencyKey: string,
   ): Promise<void> {
+    const accessCurrent = this.captureAccess();
     if (
-      this.isInactive()
+      !accessCurrent()
       || !this.isProcedures()
       || !this.canManagePrices()
       || this.creatingPriceVersion()
     ) return;
 
     const initialRoute = this.route().localPath;
-    const isCurrent = () => !this.isInactive()
+    const isCurrent = () => accessCurrent()
       && this.route().localPath === initialRoute
       && this.canManagePrices();
 
@@ -290,8 +411,11 @@ export class BillingCompositionRoot {
     this.creatingPriceVersion.set(true);
 
     try {
-      await createProcedurePriceHttp(this.context, request, idempotencyKey);
+      const saved = await createProcedurePriceHttp(this.context, request, idempotencyKey);
       if (!isCurrent()) return;
+      this.priceAttempt = undefined;
+      this.createdPrice.set(saved);
+      this.catalog()?.resetForSession();
       await this.loadProcedurePrices();
       if (isCurrent()) {
         this.priceVersionMessage.set(
@@ -320,31 +444,81 @@ export class BillingCompositionRoot {
       || this.creatingPriceVersion()
     ) return;
 
-    void this.createPriceVersion(request, crypto.randomUUID());
+    const fingerprint = JSON.stringify([this.securityKey(), request.procedureCode, request.name, request.basePrice, request.validFrom]);
+    if (this.priceAttempt?.fingerprint !== fingerprint) this.priceAttempt = { fingerprint, key: crypto.randomUUID() };
+    this.createdPrice.set(null);
+    void this.createPriceVersion(request, this.priceAttempt.key);
   }
 
-  async loadExtraChargeRules(): Promise<void> {
-    if (this.isInactive() || !this.isExtraChargeRules()) return;
-
-    const generation = ++this.extraChargeRulesRequestGeneration;
-    this.extraChargeRulesReadState.set({ status: 'loading', rules: [] });
-
+  async requestExtraChargeRuleCreation(request: CreateHttpExtraChargeRuleRequest): Promise<void> {
+    const accessCurrent = this.captureAccess();
+    const actor = this.session()?.user?.id;
+    if (!actor || !accessCurrent() || !this.isExtraChargeRules()
+      || !this.canManagePrices() || this.creatingExtraChargeRule()) return;
+    const body: CreateHttpExtraChargeRuleRequest = {
+      code: request.code, itemType: request.itemType, unitPrice: request.unitPrice,
+      requiresApproval: request.requiresApproval, validFrom: request.validFrom,
+    };
+    const fingerprint = JSON.stringify(body);
+    if (this.extraRuleAttempt?.actor !== actor || this.extraRuleAttempt.fingerprint !== fingerprint) {
+      this.extraRuleAttempt = { actor, fingerprint, key: crypto.randomUUID() };
+    }
+    const attempt = this.extraRuleAttempt;
+    const isCurrent = () => accessCurrent() && this.isExtraChargeRules()
+      && this.canManagePrices() && this.session()?.user?.id === actor;
+    this.extraChargeRuleMessage.set('');
+    this.createdExtraChargeRule.set(null);
+    this.creatingExtraChargeRule.set(true);
     try {
-      const result = await readExtraChargeRulesHttp(this.context);
-      if (this.isInactive() || !this.isExtraChargeRules()
-        || generation !== this.extraChargeRulesRequestGeneration) return;
-      this.extraChargeRulesReadState.set({ status: 'success', rules: result.data });
+      const rule = await createExtraChargeRuleHttp(this.context, body, attempt.key);
+      if (!isCurrent()) return;
+      this.extraRuleAttempt = undefined;
+      this.createdExtraChargeRule.set(rule);
+      await this.loadExtraChargeRules();
+      if (isCurrent()) {
+        this.extraChargeRuleMessage.set(this.extraChargeRulesReadState().status === 'success'
+          ? 'Versión de regla registrada correctamente.'
+          : 'Regla registrada, pero no se pudo actualizar el catálogo.');
+      }
+    } catch (error) {
+      if (isCurrent()) {
+        this.extraChargeRuleMessage.set(error instanceof ExtraChargeRuleCreationError && error.status === 409
+          ? 'No se pudo registrar la regla por un conflicto. Revise su código y fecha de vigencia.'
+          : 'No se pudo confirmar el registro. Reintente con los mismos datos.');
+        this.context.reportFailure?.({ code: 'PORTAL_TASK_FAILED' });
+      }
+    } finally {
+      if (!this.isInactive()) this.creatingExtraChargeRule.set(false);
+    }
+  }
+
+  async loadExtraChargeRules(page?: number): Promise<void> {
+    const accessCurrent = this.captureAccess();
+    const actor = this.session()?.user?.id;
+    const canRead = () => this.session()?.state === 'authenticated'
+      && this.session()?.user?.id === actor
+      && this.session()?.user?.roles.some(role => ['ADMINISTRATOR', 'SECRETARY_ASSISTANT'].includes(role)) === true;
+    if (!accessCurrent() || !this.isExtraChargeRules() || !canRead()) return;
+    const generation = ++this.extraChargeRulesRequestGeneration;
+    const isCurrent = () => accessCurrent() && this.isExtraChargeRules() && canRead()
+      && generation === this.extraChargeRulesRequestGeneration;
+    this.extraChargeRulesReadState.set({ status: 'loading', rules: [] });
+    try {
+      const result = await readExtraChargeRulesHttp(this.context, page);
+      if (isCurrent()) {
+        this.ruleMeta.set(readPageMeta(result.meta));
+        this.extraChargeRulesReadState.set({ status: 'success', rules: result.data });
+      }
     } catch {
-      if (this.isInactive() || !this.isExtraChargeRules()
-        || generation !== this.extraChargeRulesRequestGeneration) return;
-      this.extraChargeRulesReadState.set({ status: 'error', rules: [] });
+      if (isCurrent()) this.extraChargeRulesReadState.set({ status: 'error', rules: [] });
     }
   }
 
   async requestPaymentHistory(intent: PaymentHistoryIntent): Promise<void> {
+    const accessCurrent = this.captureAccess();
     const invoice = this.displayedInvoiceDetailReadState().invoice;
     if (
-      this.isInactive() || !this.canReadPaymentHistory()
+      !accessCurrent() || !this.canReadPaymentHistory()
       || !invoice || invoice.id !== intent.invoiceId
       || this.invoiceId() !== intent.invoiceId
       || this.paymentHistoryState().status === 'loading'
@@ -356,7 +530,7 @@ export class BillingCompositionRoot {
       status: 'loading', invoiceId: intent.invoiceId, data: [], meta: empty,
     });
 
-    const isCurrent = () => !this.isInactive()
+    const isCurrent = () => accessCurrent()
       && this.canReadPaymentHistory()
       && this.invoiceId() === intent.invoiceId
       && generation === this.paymentHistoryGeneration;
@@ -381,7 +555,8 @@ export class BillingCompositionRoot {
     }
   }
   async loadInvoiceDetail(invoiceId: string): Promise<void> {
-    if (this.isInactive()) return;
+    const accessCurrent = this.captureAccess();
+    if (!accessCurrent()) return;
 
     const generation = ++this.invoiceDetailRequestGeneration;
 
@@ -390,7 +565,7 @@ export class BillingCompositionRoot {
       invoiceId,
       this.invoiceDetailReadState(),
       state => {
-        if (!this.isInactive() && generation === this.invoiceDetailRequestGeneration) {
+        if (accessCurrent() && generation === this.invoiceDetailRequestGeneration) {
           this.invoiceDetailReadState.set(state);
         }
       },
@@ -398,7 +573,8 @@ export class BillingCompositionRoot {
   }
 
   async syncInvoiceRoute(): Promise<void> {
-    if (this.isInactive() || this.invoiceListMode() !== 'http') return;
+    const accessCurrent = this.captureAccess();
+    if (!accessCurrent() || this.invoiceListMode() !== 'http') return;
 
     const id = this.invoiceId();
     if (!id || (!this.isInvoiceDetail() && !this.isPaymentRoute())) return;
@@ -416,7 +592,7 @@ export class BillingCompositionRoot {
     this.pendingDetailId = id;
 
     const pending = this.loadInvoiceDetail(id).then(() => {
-      if (this.isInactive()) return;
+      if (!accessCurrent()) return;
 
       const state = this.invoiceDetailReadState();
       if (this.invoiceId() === id
@@ -430,7 +606,7 @@ export class BillingCompositionRoot {
     try {
       await pending;
     } finally {
-      if (this.pendingDetailId === id) {
+      if (this.pendingDetailId === id && this.pendingDetailLoad === pending) {
         this.pendingDetailId = undefined;
         this.pendingDetailLoad = undefined;
       }
@@ -469,10 +645,15 @@ export class BillingCompositionRoot {
     this.isInvoiceList() && this.invoiceListMode() === 'http');
   readonly isProcedures = computed(() => this.route().localPath === '/procedures');
   readonly isExtraChargeRules = computed(() => this.route().localPath === '/procedures/rules');
+  readonly isDraftRoute = computed(() => this.invoiceListMode() === 'http' && this.route().localPath === '/invoices/new');
+  readonly draftPage = viewChild(InvoiceDraftPageComponent);
   readonly catalog = viewChild(PricingCatalogComponent);
+  readonly ruleCatalog = viewChild(ExtraChargeRulesComponent);
   readonly paymentPage = viewChild(InvoicePaymentPageComponent);
   readonly httpPaymentPage = viewChild(InvoicePaymentHttpPageComponent);
   readonly manualChargePage = viewChild(ManualChargeFormComponent);
+
+  readonly correctionDetail=viewChild(InvoiceDetailHttpPageComponent);
 
   canLeave(): boolean {
     const page = this.catalog();
@@ -481,13 +662,14 @@ export class BillingCompositionRoot {
     const httpSafe = !this.httpPaymentPage()?.dirty && !this.recordingPayment();
     const manualSafe =
       !this.manualChargePage()?.dirty && !this.recordingManualCharge();
-    return catalogSafe && demoSafe && httpSafe && manualSafe
-      && !this.creatingPriceVersion();
+    return !this.issuingInvoice() && !this.draftPage()?.dirty && !this.correctionDetail()?.correctionDirty && catalogSafe && demoSafe && httpSafe && manualSafe
+      && !this.creatingPriceVersion() && !this.creatingExtraChargeRule()
+      && !this.ruleCatalog()?.creationDirty;
   }
 
   private readonly invoiceId = computed(() => {
     const match = /^\/invoices\/([^/]+)(\/payment)?$/.exec(this.route().localPath);
-    if (!match) return undefined;
+    if (!match || match[1] === 'new') return undefined;
     try { return decodeURIComponent(match[1]); } catch { return undefined; }
   });
 
@@ -549,10 +731,11 @@ export class BillingCompositionRoot {
   });
 
   async registerManualCharge(request: RecordManualChargeRequest): Promise<void> {
+    const accessCurrent = this.captureAccess();
     const source = this.manualChargeContext();
 
     if (
-      this.isInactive()
+      !accessCurrent()
       || this.recordingManualCharge()
       || !this.canRecordManualCharges()
       || !source
@@ -568,7 +751,7 @@ export class BillingCompositionRoot {
     const initialRoute = this.route().localPath;
 
     const isCurrent = () =>
-      !this.isInactive()
+      accessCurrent()
       && this.canRecordManualCharges()
       && this.manualChargeContext() === initialSource
       && this.route().localPath === initialRoute;
@@ -580,6 +763,7 @@ export class BillingCompositionRoot {
       await recordManualChargeHttp(this.context, request);
 
       if (isCurrent()) {
+        this.manualChargePage()?.resetForSource();
         this.manualChargeMessage.set('Cargo manual registrado correctamente.');
       }
     } catch {
@@ -601,8 +785,9 @@ export class BillingCompositionRoot {
   }
 
   async registerPayment(request: RecordPaymentRequest): Promise<void> {
+    const accessCurrent = this.captureAccess();
     if (
-      this.isInactive()
+      !accessCurrent()
       || this.recordingPayment()
       || !this.canRecordPayments()
       || this.invoiceListMode() !== 'http'
@@ -627,7 +812,7 @@ export class BillingCompositionRoot {
 
     const initialRoute = this.route().localPath;
     const isCurrent = () =>
-      !this.isInactive()
+      accessCurrent()
       && this.canRecordPayments()
       && this.route().localPath === initialRoute
       && this.invoiceId() === request.invoiceId;
@@ -640,6 +825,7 @@ export class BillingCompositionRoot {
 
       if (!isCurrent()) return;
 
+      this.httpPaymentPage()?.resetForSession();
       await this.loadInvoiceDetail(request.invoiceId);
 
       if (!isCurrent()) return;
@@ -683,8 +869,9 @@ export class BillingCompositionRoot {
   }
 
   async downloadInvoicePdf(invoiceId: string): Promise<void> {
+    const accessCurrent = this.captureAccess();
     if (
-      this.isInactive()
+      !accessCurrent()
       || this.downloadingPdf()
       || !this.canDownloadPdfInvoices()
     ) {
@@ -697,7 +884,7 @@ export class BillingCompositionRoot {
     if (
       readState.status !== 'success'
       || !invoice
-      || invoice.status !== 'ISSUED'
+      || !['ISSUED', 'PARTIALLY_PAID', 'PAID'].includes(invoice.status)
       || invoice.id !== invoiceId
       || invoice.id !== this.invoiceId()
     ) {
@@ -708,7 +895,7 @@ export class BillingCompositionRoot {
     const initialReadState = this.invoiceDetailReadState();
 
     const isCurrent = () =>
-      !this.isInactive()
+      accessCurrent()
       && this.canDownloadPdfInvoices()
       && this.route().localPath === initialRoute
       && this.invoiceId() === invoiceId
@@ -753,8 +940,9 @@ export class BillingCompositionRoot {
   async issueInvoice(request: InvoiceIssuanceIntent & {
     readonly idempotencyKey: string;
   }): Promise<void> {
+    const accessCurrent = this.captureAccess();
     if (
-      this.isInactive()
+      !accessCurrent()
       || this.issuingInvoice()
       || !this.canIssueInvoices()
     ) {
@@ -779,7 +967,7 @@ export class BillingCompositionRoot {
     const initialReadState = this.invoiceDetailReadState();
 
     const isCurrent = () =>
-      !this.isInactive()
+      accessCurrent()
       && this.canIssueInvoices()
       && this.route().localPath === initialRoute
       && this.invoiceId() === request.invoiceId;
@@ -859,6 +1047,17 @@ export class BillingCompositionRoot {
   readonly message = computed(() => this.route().localPath === '/'
     ? 'La integración de Billing no está disponible.'
     : 'La ruta solicitada no está disponible en Billing.');
+
+  async refreshCurrentRoute(): Promise<void> {
+    if (this.isInvoiceList()) await this.loadInvoices(this.invoiceMeta()?.page);
+    else if (this.isProcedures()) await this.loadProcedurePrices(this.priceMeta()?.page);
+    else if (this.isExtraChargeRules()) await this.loadExtraChargeRules(this.ruleMeta()?.page);
+    else if (this.invoiceId()) await this.loadInvoiceDetail(this.invoiceId()!);
+  }
+
+  async navigateLocal(path: string): Promise<void> {
+    await this.navigate(`${this.route().basePath}${path}`);
+  }
 
   async openInvoice(id: string): Promise<void> {
     await this.navigate(`${this.route().basePath}/invoices/${encodeURIComponent(id)}`);

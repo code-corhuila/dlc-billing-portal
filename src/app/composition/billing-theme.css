@@ -1,0 +1,179 @@
+/* PDF pp. 7, 13, 14, 18. Reuse the compositor's tokens; never style another remote. */
+dlc-billing-root.dlc-billing {
+  --billing-accent: var(--dlc-teal, #1ea296);
+  --billing-accent-strong: var(--dlc-teal-strong, #20a99a);
+  --billing-background: var(--dlc-page-bg, #f7f9fb);
+  --billing-border: var(--dlc-line, #c2c6d4);
+  --billing-text: var(--dlc-text, #1f2933);
+  --billing-muted: var(--dlc-text-nav, #424752);
+  display: flow-root;
+  min-width: 0;
+  color: var(--billing-text);
+  font: 14px/1.5 var(--dlc-font, Inter, system-ui, sans-serif);
+  background: var(--billing-background);
+}
+
+dlc-billing-root.dlc-billing *,
+dlc-billing-root.dlc-billing *::before,
+dlc-billing-root.dlc-billing *::after { box-sizing: border-box; }
+
+dlc-billing-root.dlc-billing :is(dlc-invoice-detail-http-page, dlc-invoice-payment-http-page,
+  dlc-invoice-draft-page, dlc-manual-charge-form, dlc-price-correction-form) {
+  display: block;
+  min-width: 0;
+}
+
+dlc-billing-root.dlc-billing :is(h1, h2, h3) { color: var(--billing-text); line-height: 1.25; }
+dlc-billing-root.dlc-billing h1 { margin: 0 0 8px; font-size: 32px; font-weight: 700; letter-spacing: -.025em; }
+dlc-billing-root.dlc-billing h1:focus { outline: none; }
+dlc-billing-root.dlc-billing dlc-pricing-catalog h1 { font-size: 24px; }
+dlc-billing-root.dlc-billing h2 { margin: 0 0 16px; font-size: 20px; font-weight: 600; }
+dlc-billing-root.dlc-billing h3 { margin: 0 0 16px; font-size: 17px; font-weight: 600; }
+dlc-billing-root.dlc-billing p { line-height: 1.6; overflow-wrap: anywhere; }
+dlc-billing-root.dlc-billing :is(a, .card-price) { color: var(--billing-accent); }
+
+dlc-billing-root.dlc-billing button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 40px;
+  max-width: 100%;
+  margin: 0;
+  padding: 9px 16px;
+  border: 1px solid var(--billing-border);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--billing-muted);
+  font: 600 14px/1.4 var(--dlc-font, Inter, system-ui, sans-serif);
+  cursor: pointer;
+  transition: background-color .15s, border-color .15s;
+}
+dlc-billing-root.dlc-billing button:hover:not(:disabled) { border-color: var(--billing-accent); background: #edf9f7; color: #0f766e; }
+dlc-billing-root.dlc-billing :is(button.billing-primary, button.primary, button.primary-button, button[type="submit"]) {
+  border-color: var(--billing-accent);
+  background: var(--billing-accent);
+  color: #fff;
+}
+dlc-billing-root.dlc-billing :is(button.billing-primary, button.primary, button.primary-button, button[type="submit"]):hover:not(:disabled) {
+  border-color: #168e82; background: #168e82; color: #fff;
+}
+dlc-billing-root.dlc-billing button:disabled { opacity: 1; background: #eef2f6; border-color: #dce2ea; color: #748193; cursor: not-allowed; }
+dlc-billing-root.dlc-billing :is(button, input, select, textarea, a, .table-scroll):focus-visible {
+  outline: 3px solid var(--dlc-focus, #1554a3); outline-offset: 3px;
+}
+
+dlc-billing-root.dlc-billing .billing-navigation {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 28px;
+  padding: 0 0 20px;
+  border-bottom: 1px solid #dce2ea;
+}
+dlc-billing-root.dlc-billing .billing-navigation button { background: transparent; border-color: transparent; }
+dlc-billing-root.dlc-billing .billing-navigation button[aria-current="page"] { background: var(--dlc-active-bg, #e4ebf8); color: #0f766e; }
+dlc-billing-root.dlc-billing .billing-navigation button.billing-primary {
+  margin-left: auto; background: var(--billing-accent); border-color: var(--billing-accent); color: #fff;
+}
+
+dlc-billing-root.dlc-billing :is(dlc-billing-list-page, dlc-pricing-catalog, dlc-extra-charge-rules) .billing-page {
+  width: 100%; max-width: none; margin: 0; padding: 0 0 32px; background: transparent;
+}
+dlc-billing-root.dlc-billing :is(.page-header, dlc-billing-list-page header) { margin-bottom: 28px; gap: 24px; }
+dlc-billing-root.dlc-billing :is(.page-description, .description, dlc-billing-list-page header > p) { color: var(--billing-muted); font-size: 15px; }
+dlc-billing-root.dlc-billing :is(.eyebrow, dlc-billing-list-page header > p:first-child) { display: none; }
+dlc-billing-root.dlc-billing [role="note"] { font-size: 13px; color: #64748b; }
+dlc-billing-root.dlc-billing :is(.invoice-panel, .catalog-card, .state-card, .summary article, .procedure-card) {
+  border: 1px solid var(--billing-border); border-radius: 8px; background: #fff;
+}
+dlc-billing-root.dlc-billing :is(.invoice-panel, .state-card, .summary article) { padding: 24px; }
+dlc-billing-root.dlc-billing .state-card { min-height: 152px; }
+dlc-billing-root.dlc-billing .state-card p { color: var(--billing-muted); }
+dlc-billing-root.dlc-billing .summary strong { font-size: 26px; }
+dlc-billing-root.dlc-billing :is(.toolbar, .filters) { gap: 16px; }
+dlc-billing-root.dlc-billing .toolbar { padding: 16px; border-color: #dce2ea; border-radius: 12px; }
+dlc-billing-root.dlc-billing .filters { margin-bottom: 24px; }
+
+dlc-billing-root.dlc-billing :is(input, select, textarea) {
+  min-height: 42px; min-width: 0; max-width: 100%; padding: 10px 12px;
+  border: 1px solid var(--billing-border); border-radius: 6px; background: #fff;
+  color: var(--billing-text); font: inherit;
+}
+dlc-billing-root.dlc-billing :is(input, textarea)::placeholder { color: #8595ad; }
+dlc-billing-root.dlc-billing :is(input, select, textarea):disabled { background: #f1f4f7; color: #64748b; }
+dlc-billing-root.dlc-billing textarea { min-height: 104px; resize: vertical; }
+dlc-billing-root.dlc-billing input[type="checkbox"] { width: 18px; min-height: 18px; height: 18px; padding: 0; accent-color: var(--billing-accent); flex: none; }
+dlc-billing-root.dlc-billing label { color: var(--billing-muted); font-size: 14px; font-weight: 600; }
+dlc-billing-root.dlc-billing :is(dlc-invoice-draft-page, dlc-manual-charge-form, dlc-invoice-payment-http-page, dlc-price-correction-form) label {
+  display: flex; flex-direction: column; gap: 8px;
+}
+dlc-billing-root.dlc-billing :is(dlc-invoice-draft-page, dlc-manual-charge-form, dlc-invoice-payment-http-page, dlc-price-correction-form) :is(input, select, textarea) { width: 100%; }
+
+dlc-billing-root.dlc-billing .table-scroll,
+dlc-billing-root.dlc-billing .table-wrapper { max-width: 100%; overflow-x: auto; }
+dlc-billing-root.dlc-billing table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+dlc-billing-root.dlc-billing th { padding: 16px; background: #f2f4f6; color: var(--billing-muted); font-size: 13px; font-weight: 600; letter-spacing: .025em; text-align: left; }
+dlc-billing-root.dlc-billing td { padding: 20px 16px; border-bottom: 1px solid #dce2ea; vertical-align: middle; }
+dlc-billing-root.dlc-billing tbody tr:last-child td { border-bottom: 0; }
+dlc-billing-root.dlc-billing tbody tr:hover { background: #f7fafb; }
+dlc-billing-root.dlc-billing .billing-status { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 20px; background: #eef2f6; color: #526277; font-size: 12px; font-weight: 600; white-space: nowrap; }
+dlc-billing-root.dlc-billing .billing-status[data-status="PAID"] { background: #d8f2ec; color: #087d71; }
+dlc-billing-root.dlc-billing .billing-status[data-status="ISSUED"] { background: #ffe2e0; color: #a62525; }
+dlc-billing-root.dlc-billing .billing-status[data-status="PARTIALLY_PAID"] { background: #fff2d4; color: #875a06; }
+dlc-billing-root.dlc-billing :is(.card-price, .billing-amount) { color: var(--billing-accent); font-weight: 700; font-variant-numeric: tabular-nums; }
+dlc-billing-root.dlc-billing .catalog-grid { gap: 24px; }
+dlc-billing-root.dlc-billing .procedure-card { padding: 20px; box-shadow: 0 2px 5px #1f293305; }
+dlc-billing-root.dlc-billing .procedure-card h2 { font-size: 17px; }
+dlc-billing-root.dlc-billing .status-badge.active { color: #008a56; background: #dff5eb; }
+dlc-billing-root.dlc-billing nav[aria-label^="Paginación"] { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 12px; margin: 20px 0 0; color: var(--billing-muted); }
+dlc-billing-root.dlc-billing nav[aria-label^="Paginación"] > p { margin-right: auto; flex-basis: 100%; font-size: 13px; }
+
+dlc-billing-root.dlc-billing :is(dlc-invoice-draft-page, dlc-manual-charge-form) > section,
+dlc-billing-root.dlc-billing :is(dlc-invoice-detail-http-page, dlc-invoice-payment-http-page) > section {
+  max-width: none; margin: 0; padding: 0;
+}
+dlc-billing-root.dlc-billing :is(dlc-invoice-draft-page, dlc-manual-charge-form) > section > form,
+dlc-billing-root.dlc-billing :is(dlc-invoice-detail-http-page, dlc-invoice-payment-http-page) article {
+  margin: 24px 0; padding: 28px; border: 1px solid var(--billing-border); border-radius: 8px; background: #fff;
+}
+dlc-billing-root.dlc-billing :is(dlc-invoice-draft-page, dlc-manual-charge-form) form {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px;
+}
+dlc-billing-root.dlc-billing dlc-manual-charge-form form > :is(p, label:has(textarea)) { grid-column: 1 / -1; }
+dlc-billing-root.dlc-billing dlc-invoice-draft-page form > button { grid-column: 1 / -1; justify-self: start; }
+dlc-billing-root.dlc-billing dlc-invoice-draft-page li label:has(input[type="checkbox"]) { flex-direction: row; align-items: center; }
+dlc-billing-root.dlc-billing :is(dlc-invoice-detail-http-page, dlc-invoice-payment-http-page) section > button:first-child { margin-bottom: 20px; color: #0f766e; }
+dlc-billing-root.dlc-billing :is(dlc-invoice-detail-http-page, dlc-invoice-payment-http-page) article > button { margin: 8px 8px 8px 0; }
+dlc-billing-root.dlc-billing dlc-invoice-detail-http-page article > section { margin: 28px 0; padding-top: 24px; border-top: 1px solid #dce2ea; }
+dlc-billing-root.dlc-billing dlc-invoice-detail-http-page ul { list-style: none; padding: 0; }
+dlc-billing-root.dlc-billing dlc-invoice-detail-http-page li { padding: 16px; border-bottom: 1px solid #dce2ea; background: #fafbfc; }
+dlc-billing-root.dlc-billing dlc-invoice-detail-http-page li p { margin: 8px 0; }
+dlc-billing-root.dlc-billing dlc-invoice-payment-http-page form { display: grid; gap: 20px; max-width: 640px; margin-top: 24px; padding-top: 24px; border-top: 3px solid var(--billing-accent); }
+dlc-billing-root.dlc-billing dlc-price-correction-form form { display: grid; gap: 16px; padding: 20px; border: 1px solid #e8d6a5; border-radius: 8px; background: #fffaf0; }
+dlc-billing-root.dlc-billing :is([role="alert"], .validation-message) { color: #a62525; }
+dlc-billing-root.dlc-billing > p[role="status"]:empty { margin: 0; }
+
+dlc-billing-root.dlc-billing dialog { width: min(520px, calc(100% - 32px)); max-width: calc(100% - 32px); max-height: calc(100dvh - 48px); margin: auto; padding: 28px; border: 1px solid var(--billing-border); border-radius: 12px; background: #fff; color: var(--billing-text); box-shadow: 0 24px 64px #1f293326; }
+dlc-billing-root.dlc-billing dialog::backdrop { background: #1f293366; }
+dlc-billing-root.dlc-billing dialog h2 { font-size: 22px; }
+dlc-billing-root.dlc-billing dialog footer { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 12px; margin-top: 24px; }
+dlc-billing-root.dlc-billing dialog .icon-button { width: 40px; padding: 0; }
+
+@media (max-width: 900px) {
+  dlc-billing-root.dlc-billing h1 { font-size: 28px; }
+  dlc-billing-root.dlc-billing .page-header { flex-direction: column; }
+}
+@media (max-width: 600px) {
+  dlc-billing-root.dlc-billing h1 { font-size: 24px; overflow-wrap: anywhere; }
+  dlc-billing-root.dlc-billing .billing-navigation { gap: 6px; padding-bottom: 16px; margin-bottom: 24px; }
+  dlc-billing-root.dlc-billing .billing-navigation button { padding: 8px 10px; font-size: 12px; min-height: 40px; }
+  dlc-billing-root.dlc-billing .billing-navigation button.billing-primary { margin-left: 0; }
+  dlc-billing-root.dlc-billing :is(.invoice-panel, .state-card, .summary article) { padding: 16px; }
+  dlc-billing-root.dlc-billing :is(dlc-invoice-draft-page, dlc-manual-charge-form) form { grid-template-columns: minmax(0, 1fr); }
+  dlc-billing-root.dlc-billing :is(dlc-invoice-draft-page, dlc-manual-charge-form) > section > form,
+  dlc-billing-root.dlc-billing :is(dlc-invoice-detail-http-page, dlc-invoice-payment-http-page) article { padding: 16px; }
+  dlc-billing-root.dlc-billing dialog { padding: 20px; }
+  dlc-billing-root.dlc-billing nav[aria-label^="Paginación"] { justify-content: flex-start; }
+}

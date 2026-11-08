@@ -1,3 +1,4 @@
+import { minimumPaymentForBalance } from '../domain/initial-payment-minimum';
 import {
   Component, DestroyRef, EventEmitter, Input, Output, inject,
 } from '@angular/core';
@@ -33,6 +34,7 @@ import { formatCopMoney } from '../presentation/format-cop-money';
             <p role="status">No tiene permisos para registrar pagos.</p>
           }
 
+          <p>Primer abono: al menos 50 % del total, redondeado hacia arriba al centavo. Pagos posteriores desde COP 0,01. Mínimo actual: COP {{ format(minimumAmount) }}.</p>
           <form (ngSubmit)="submit()">
             <label>
               Valor del pago (COP)
@@ -79,6 +81,10 @@ export class InvoicePaymentHttpPageComponent {
   amount = '';
   method = '';
   readonly format = formatCopMoney;
+  get minimumAmount() {
+    const invoice = this.selectedInvoice;
+    return invoice ? minimumPaymentForBalance(invoice.total, invoice.balance) : copMoney('0.01');
+  }
 
   get selectedInvoice(): ReadInvoice | undefined {
     return this.readState.status === 'success'
@@ -111,7 +117,7 @@ export class InvoicePaymentHttpPageComponent {
       const amount = BigInt(copMoney(this.amount).replace('.', ''));
       const balance = BigInt(invoice.balance.replace('.', ''));
 
-      return amount > 0n && amount <= balance;
+      return amount > 0n && amount >= BigInt(this.minimumAmount.replace('.', '')) && amount <= balance;
     } catch {
       return false;
     }
@@ -147,6 +153,10 @@ export class InvoicePaymentHttpPageComponent {
 
   discard(): void {
     if (this.recording) return;
+    this.resetForSession();
+  }
+
+  resetForSession(): void {
     this.amount = '';
     this.method = '';
     this.intent = undefined;

@@ -1,3 +1,4 @@
+import { pageQuery } from '../../data/pagination';
 import type { PortalContext } from '../../../shell-contract';
 import { copMoney, type CopMoney } from '../../model/cop-money';
 
@@ -149,6 +150,8 @@ export function readProcedurePricePage(
 
 export async function readProcedurePricesHttp(
   context: Pick<PortalContext, 'http' | 'signal'>,
+  page?: number,
+  limit = 20,
 ): Promise<ProcedurePricePage> {
   if (context.signal.aborted) {
     throw new Error('Procedure price request cancelled');
@@ -156,7 +159,7 @@ export async function readProcedurePricesHttp(
 
   const result = await context.http.request({
     method: 'GET',
-    path: '/api/v1/procedure-prices',
+    path: `/api/v1/procedure-prices${page === undefined ? '' : pageQuery(page, limit)}`,
     signal: context.signal,
   });
 

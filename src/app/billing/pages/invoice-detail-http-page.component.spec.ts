@@ -219,10 +219,10 @@ it('does not allow PDF download by default', () => {
   expect(page.canDownloadPdf).toBe(false);
 });
 
-it('allows an authorized PDF download for an issued invoice', () => {
+it.each(['ISSUED', 'PARTIALLY_PAID', 'PAID'] as const)('allows an authorized PDF download for %s', status => {
   const page = setup(invoiceDetailReadSuccess({
     ...invoice,
-    status: 'ISSUED',
+    status,
   }));
 
   page.canDownloadPdfInvoices = true;
@@ -494,4 +494,11 @@ it('returns an empty list when the invoice has no billable items', () => {
   const page = setup(invoiceDetailReadSuccess({ ...invoice, items: [] }));
 
   expect(page.displayedItems).toEqual([]);
+});
+
+it('blocks issuance while a correction is pending or its form is dirty', () => {
+  const draft={...invoice,status:'DRAFT' as const,items:invoice.items.map(item=>({...item,approvalRequired:true}))};
+  const page=setup(invoiceDetailReadSuccess(draft));page.canIssueInvoices=true;
+  const emit=vi.spyOn(page.issue,'emit');
+  expect(page.canIssue).toBe(false);page.requestIssuance();expect(emit).not.toHaveBeenCalled();
 });
