@@ -18,7 +18,8 @@ export async function readInvoicesHttp(
 
   const result = await context.http.request({
     method: 'GET',
-    path: `/api/v1/invoices${page === undefined ? '' : pageQuery(page, limit)}`,
+    path: '/api/v1/invoices',
+    ...(page === undefined ? {} : { query: pageQuery(page, limit) }),
     signal: context.signal,
   });
 
