@@ -8,6 +8,8 @@ The format follows the principles of Keep a Changelog and Semantic Versioning.
 
 ### Added
 
+- "Pendientes de precio" (Admin and Secretary/Assistant) lists encounters still waiting for a price through `GET /api/v1/encounter-accounts/pending-prices`, with the missing codes and the date the price must be valid from (ADR-015 decision 6).
+
 - Draft invoice creation from patient-filtered, paginated UNBILLED items, with server-owned totals and idempotent retries.
 - HTTP price versioning, remote pagination for invoices/prices/rules, and composed navigation to rules/draft creation.
 - Operation/schema contract snapshot, explicit CI contract check, and audit remediation evidence.
