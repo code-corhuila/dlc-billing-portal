@@ -1,4 +1,4 @@
-import { Component, DestroyRef, Input, OnInit, inject } from '@angular/core';
+import { ChangeDetectorRef, Component, DestroyRef, Input, OnInit, inject } from '@angular/core';
 import type { PortalContext } from '../../shell-contract';
 import { pageQuery, readPageMeta, type PageMeta } from '../data/pagination';
 
@@ -90,6 +90,8 @@ function readAccount(value: unknown): PendingAccount {
 })
 export class PendingPricesPageComponent implements OnInit {
   private readonly destroyRef = inject(DestroyRef);
+  // Zoneless portal: results that arrive after an await must ask Angular to render them.
+  private readonly changes = inject(ChangeDetectorRef, { optional: true });
   @Input() context!: PortalContext;
   accounts: PendingAccount[] = [];
   meta: PageMeta | null = null;
@@ -120,6 +122,6 @@ export class PendingPricesPageComponent implements OnInit {
       }
     } catch {
       if (current()) { this.accounts = []; this.message = 'No fue posible consultar las atenciones pendientes. Puede reintentar.'; }
-    } finally { if (generation === this.generation) this.loading = false; }
+    } finally { if (generation === this.generation) this.loading = false; this.changes?.markForCheck(); }
   }
 }
