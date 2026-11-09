@@ -1,4 +1,4 @@
-import { Component, DestroyRef, EventEmitter, Input, Output, inject } from '@angular/core';
+import { ChangeDetectorRef, Component, DestroyRef, EventEmitter, Input, Output, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import type { PortalContext } from '../../shell-contract';
 import { createInvoiceDraftHttp, readUnbilledItemsHttp, searchPatientsHttp, isUuid, InvoiceDraftHttpError,
@@ -61,6 +61,8 @@ import { formatCopMoney } from '../presentation/format-cop-money';
 })
 export class InvoiceDraftPageComponent {
   private readonly destroyRef = inject(DestroyRef);
+  // Zoneless portal: results that arrive after an await must ask Angular to render them.
+  private readonly changes = inject(ChangeDetectorRef, { optional: true });
   @Input() context!: PortalContext;
   @Input() canCreate = false;
   @Output() readonly created = new EventEmitter<string>();
@@ -105,7 +107,7 @@ export class InvoiceDraftPageComponent {
       }
     } catch {
       if (current()) this.message = 'No fue posible buscar pacientes. Puede reintentar.';
-    } finally { if (generation === this.generation) this.searching = false; }
+    } finally { if (generation === this.generation) this.searching = false; this.changes?.markForCheck(); }
   }
   async selectPatient(option: PatientOption): Promise<void> {
     if (this.saving || !isUuid(option.id)) return;
@@ -149,7 +151,7 @@ export class InvoiceDraftPageComponent {
       if (current()) { this.items = result.data; this.meta = result.meta; this.loaded = true; }
     } catch {
       if (current()) { this.loaded = false; this.message = 'No fue posible consultar los cargos. Puede reintentar.'; }
-    } finally { if (generation === this.generation) this.loading = false; }
+    } finally { if (generation === this.generation) this.loading = false; this.changes?.markForCheck(); }
   }
   async submit(): Promise<void> {
     if (!this.canSubmit || !this.authorized()) return;
@@ -171,6 +173,6 @@ export class InvoiceDraftPageComponent {
       if (current()) this.message = error instanceof InvoiceDraftHttpError && error.status === 409
         ? 'Conflicto: revise la finalización de la atención y si los cargos ya fueron facturados.'
         : 'No se pudo confirmar la creación. Reintente con los mismos datos.';
-    } finally { if (!this.destroyRef.destroyed) this.saving = false; }
+    } finally { if (!this.destroyRef.destroyed) this.saving = false; this.changes?.markForCheck(); }
   }
 }
