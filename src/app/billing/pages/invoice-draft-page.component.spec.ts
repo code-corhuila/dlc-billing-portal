@@ -1,5 +1,5 @@
 import '@angular/compiler';
-import { Injector, runInInjectionContext } from '@angular/core';
+import { ChangeDetectorRef, Injector, runInInjectionContext } from '@angular/core';
 import { expect, it, vi } from 'vitest';
 import { InvoiceDraftPageComponent } from './invoice-draft-page.component';
 import { createInvoiceDraftHttp, readUnbilledItemsHttp } from '../data/invoice-draft-http';
@@ -144,5 +144,20 @@ it('needs two characters to search and reports a failed search', async () => {
     await page.searchPatients('laura');
     expect(page.patientResults).toEqual([]);
     expect(page.message).toBe('No fue posible buscar pacientes. Puede reintentar.');
+  } finally { injector.destroy(); }
+});
+
+it('asks Angular to render search and charge results in the zoneless portal', async () => {
+  const markForCheck = vi.fn();
+  const injector = Injector.create({ providers: [{ provide: ChangeDetectorRef, useValue: { markForCheck } }] });
+  const request = vi.fn().mockResolvedValue({ ok: true, data: { data: [item], meta } });
+  const page = runInInjectionContext(injector, () => new InvoiceDraftPageComponent());
+  page.context = { signal: new AbortController().signal, http: { request }, session: {
+    getSnapshot: () => ({ state: 'authenticated', user: { id: 'actor-a', roles: ['ADMINISTRATOR'] }, permissions: [] }),
+  } } as unknown as PortalContext;
+  page.canCreate = true; page.patientId = patientId;
+  try {
+    await page.load(1);
+    expect(markForCheck).toHaveBeenCalled();
   } finally { injector.destroy(); }
 });

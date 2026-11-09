@@ -1,5 +1,5 @@
 import '@angular/compiler';
-import { Injector, runInInjectionContext } from '@angular/core';
+import { ChangeDetectorRef, Injector, runInInjectionContext } from '@angular/core';
 import { expect, it, vi } from 'vitest';
 import { PendingPricesPageComponent } from './pending-prices-page.component';
 import type { PortalContext } from '../../shell-contract';
@@ -54,5 +54,17 @@ it('says so when nothing is pending and when Billing cannot answer', async () =>
     request.mockResolvedValueOnce({ ok: true, status: 200, data: { data: [{ ...account, missingSources: 'x' }], meta } });
     await page.load(1);
     expect(page.message).toBe('No fue posible consultar las atenciones pendientes. Puede reintentar.');
+  } finally { injector.destroy(); }
+});
+
+it('asks Angular to render the result in the zoneless portal', async () => {
+  const markForCheck = vi.fn();
+  const injector = Injector.create({ providers: [{ provide: ChangeDetectorRef, useValue: { markForCheck } }] });
+  const request = vi.fn().mockResolvedValue({ ok: true, status: 200, data: { data: [account], meta } });
+  const page = runInInjectionContext(injector, () => new PendingPricesPageComponent());
+  page.context = { signal: new AbortController().signal, http: { request } } as unknown as PortalContext;
+  try {
+    await page.load(1);
+    expect(markForCheck).toHaveBeenCalled();
   } finally { injector.destroy(); }
 });
