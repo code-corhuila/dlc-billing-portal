@@ -170,9 +170,25 @@ export class InvoiceDraftPageComponent {
         this.message = 'Borrador creado correctamente.'; this.created.emit(invoice.id);
       }
     } catch (error) {
-      if (current()) this.message = error instanceof InvoiceDraftHttpError && error.status === 409
-        ? 'Conflicto: revise la finalización de la atención y si los cargos ya fueron facturados.'
-        : 'No se pudo confirmar la creación. Reintente con los mismos datos.';
+      if (current() && error instanceof InvoiceDraftHttpError && error.code === 'APPOINTMENT_NOT_ELIGIBLE') {
+        this.message = 'No se puede crear el borrador: debe finalizar la atención en Citas antes de facturar.';
+      } else if (current() && error instanceof InvoiceDraftHttpError && error.code === 'ENCOUNTER_PRICING_PENDING') {
+        this.message = 'No se puede crear el borrador: la atención tiene al menos un precio pendiente. Revise Pendientes de precio con administración.';
+      } else if (current() && error instanceof InvoiceDraftHttpError && error.status === 409) {
+        this.message = 'Conflicto: revise la finalización de la atención y si los cargos ya fueron facturados.';
+        try {
+          const pending = await this.context.http.request({ method: 'GET', path: '/api/v1/encounter-accounts/pending-prices',
+            query: { page: ['1'], limit: ['100'] }, signal: this.context.signal });
+          if (pending.ok && current() && pending.data && typeof pending.data === 'object') {
+            const accounts = (pending.data as { data?: unknown }).data;
+            if (Array.isArray(accounts) && accounts.some(account => account?.patientId === this.patientId
+              && Array.isArray(account.missingSources) && account.missingSources.some((source: { itemType?: unknown; code?: unknown }) =>
+                source.itemType === 'COMPLEXITY_ADJUSTMENT' && !source.code))) {
+              this.message = 'Conflicto: el paciente tiene una atención con un ajuste por complejidad sin código y sin precio. Revise Pendientes de precio con administración antes de facturar.';
+            }
+          }
+        } catch { /* The generic conflict remains visible if the pending-price lookup fails. */ }
+      } else if (current()) this.message = 'No se pudo confirmar la creación. Reintente con los mismos datos.';
     } finally { if (!this.destroyRef.destroyed) this.saving = false; this.changes?.markForCheck(); }
   }
 }

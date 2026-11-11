@@ -80,7 +80,7 @@ type BillingInvoiceStatusFilter = 'ALL' | InvoiceListStatus;
             #searchInput
             id="invoice-search"
             type="search"
-            [placeholder]="readOnly ? 'Factura o ID del paciente' : 'Factura o paciente'"
+            placeholder="Factura o paciente"
             [value]="searchTerm"
             (input)="updateSearchTerm(searchInput.value)"
           />
@@ -282,7 +282,7 @@ export class BillingListPageComponent {
   }
 
   get patientColumnLabel(): string {
-    return this.readOnly ? 'ID del paciente' : 'Paciente';
+    return 'Paciente';
   }
 
   displayPatient(invoice: InvoiceListItem): string {

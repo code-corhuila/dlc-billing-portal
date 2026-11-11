@@ -109,7 +109,42 @@ it('keeps selection for conflict review and denies unauthorized creation', async
   try {
     page.toggle(readBillableItem(item)); request.mockResolvedValue({ ok: false, status: 409 });
     await page.submit(); expect(page.message).toContain('Conflicto'); expect(page.selected.size).toBe(1);
-    page.canCreate = false; await page.submit(); expect(request).toHaveBeenCalledTimes(1);
+    page.canCreate = false; await page.submit(); expect(request).toHaveBeenCalledTimes(2);
+  } finally { injector.destroy(); }
+});
+
+it('explains a pending unpriced source when draft creation conflicts', async () => {
+  const { request, page, injector } = setup();
+  try {
+    page.toggle(readBillableItem(item));
+    request.mockResolvedValueOnce({ ok: false, status: 409 });
+    request.mockResolvedValueOnce({ ok: true, data: { data: [{ patientId,
+      missingSources: [{ itemType: 'COMPLEXITY_ADJUSTMENT', code: '' }] }], meta } });
+    await page.submit();
+    expect(page.message).toContain('ajuste por complejidad');
+    expect(page.message).toContain('sin código');
+    expect(page.selected.size).toBe(1);
+  } finally { injector.destroy(); }
+});
+
+it('explains that an appointment must be finalized when the owner rejects it', async () => {
+  const { request, page, injector } = setup();
+  try {
+    page.toggle(readBillableItem(item));
+    request.mockResolvedValueOnce({ ok: false, status: 409, error: 'APPOINTMENT_NOT_ELIGIBLE' });
+    await page.submit();
+    expect(page.message).toContain('finalizar');
+    expect(page.message).toContain('Citas');
+  } finally { injector.destroy(); }
+});
+
+it('explains when selected charges belong to an encounter with prices pending', async () => {
+  const { request, page, injector } = setup();
+  try {
+    page.toggle(readBillableItem(item));
+    request.mockResolvedValueOnce({ ok: false, status: 409, error: 'ENCOUNTER_PRICING_PENDING' });
+    await page.submit();
+    expect(page.message).toContain('precio pendiente');
   } finally { injector.destroy(); }
 });
 

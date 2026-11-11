@@ -12,7 +12,7 @@ export interface DraftInvoiceRequest {
 }
 
 export class InvoiceDraftHttpError extends Error {
-  constructor(readonly status: number) { super('Invoice draft request failed'); }
+  constructor(readonly status: number, readonly code?: string) { super('Invoice draft request failed'); }
 }
 
 export interface PatientOption { id: string; label: string }
@@ -68,7 +68,8 @@ export async function createInvoiceDraftHttp(
   const result = await context.http.request({ method: 'POST', path: '/api/v1/invoices', body,
     headers: { 'Idempotency-Key': key }, signal: context.signal });
   if (context.signal.aborted) throw new Error('Cancelled request');
-  if (!result.ok || result.status !== 201) throw new InvoiceDraftHttpError(result.status);
+  if (!result.ok) throw new InvoiceDraftHttpError(result.status, result.error);
+  if (result.status !== 201) throw new InvoiceDraftHttpError(result.status);
   const invoice = readInvoiceDetail(result.data);
   if (invoice.items.length !== body.billableItemIds.length
     || invoice.items.some(item => !body.billableItemIds.includes(item.id))

@@ -53,7 +53,8 @@ const emptyPaymentHistory: PaymentHistoryViewState = {
         <article>
           <h2>{{ displayNumber }}</h2>
           <p><strong>Identificador:</strong> {{ invoice.id }}</p>
-          <p><strong>Paciente (ID):</strong> {{ invoice.patientId }}</p>
+          <p><strong>Paciente:</strong> {{ patientName || invoice.patientId }}</p>
+          @if (patientName) { <p><strong>Paciente (ID):</strong> {{ invoice.patientId }}</p> }
 
           @if (invoice.appointmentId) {
             <p><strong>Cita (ID):</strong> {{ invoice.appointmentId }}</p>
@@ -169,6 +170,7 @@ const emptyPaymentHistory: PaymentHistoryViewState = {
   `,
 })
 export class InvoiceDetailHttpPageComponent {
+  @Input() patientName?: string;
   @Input() correctionContext?: PortalContext;
   @Input() canCorrectPrices=false;
   @Output() readonly priceCorrected=new EventEmitter<string>();

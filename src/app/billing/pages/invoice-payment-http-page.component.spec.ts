@@ -32,6 +32,18 @@ function setup() {
   return { page, injector };
 }
 
+it('offers the configured cash code with a Spanish label and rejects an unknown method', () => {
+  const { page, injector } = setup();
+  try {
+    expect(page.paymentMethods).toContainEqual({ code: 'CASH', label: 'Efectivo' });
+    page.amount = '25000.00';
+    page.method = 'Efectivo';
+    expect(page.canSubmit).toBe(false);
+    page.method = 'CASH';
+    expect(page.canSubmit).toBe(true);
+  } finally { injector.destroy(); }
+});
+
 it('emits the payment intent using the actual invoice identifier and version', () => {
   const { page, injector } = setup();
 

@@ -25,6 +25,7 @@ import { formatCopMoney } from '../presentation/format-cop-money';
         <article>
           <h2>{{ invoice.invoiceNumber || invoice.id }}</h2>
           <p>Factura: {{ invoice.id }}</p>
+          <p>Paciente: {{ patientName || invoice.patientId }}</p>
           <p>Estado: {{ invoice.status }}</p>
           <p>Versión: {{ invoice.version }}</p>
           <p>Total: COP {{ format(invoice.total) }}</p>
@@ -45,9 +46,13 @@ import { formatCopMoney } from '../presentation/format-cop-money';
 
             <label>
               Método de pago
-              <input name="method" type="text" maxlength="40"
-                [(ngModel)]="method"
-                [disabled]="!canRecordPayments || recording" />
+              <select name="method" [(ngModel)]="method"
+                [disabled]="!canRecordPayments || recording">
+                <option value="">Seleccione un método</option>
+                @for (option of paymentMethods; track option.code) {
+                  <option [value]="option.code">{{ option.label }}</option>
+                }
+              </select>
             </label>
 
             <p>Ingrese un importe positivo con dos decimales,
@@ -68,6 +73,7 @@ import { formatCopMoney } from '../presentation/format-cop-money';
   `,
 })
 export class InvoicePaymentHttpPageComponent {
+  @Input() patientName?: string;
   private readonly destroyRef = inject(DestroyRef);
   private intent?: { fingerprint: string; key: string };
 
@@ -80,6 +86,14 @@ export class InvoicePaymentHttpPageComponent {
 
   amount = '';
   method = '';
+  readonly paymentMethods = [
+    { code: 'CASH', label: 'Efectivo' },
+    { code: 'BANK_TRANSFER', label: 'Transferencia bancaria' },
+    { code: 'CREDIT_CARD', label: 'Tarjeta de crédito' },
+    { code: 'DEBIT_CARD', label: 'Tarjeta débito' },
+    { code: 'NEQUI_DAVIPLATA', label: 'Nequi o Daviplata' },
+    { code: 'OTHER', label: 'Otro' },
+  ] as const;
   readonly format = formatCopMoney;
   get minimumAmount() {
     const invoice = this.selectedInvoice;
@@ -109,7 +123,7 @@ export class InvoicePaymentHttpPageComponent {
       return false;
     }
 
-    if (!this.method.trim() || this.method.trim().length > 40) {
+    if (!this.paymentMethods.some(option => option.code === this.method)) {
       return false;
     }
 

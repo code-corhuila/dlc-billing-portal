@@ -12,6 +12,7 @@ import {
 import { BillingListPageComponent } from '../billing/pages/billing-list-page.component';
 import { INVOICE_LIST_SOURCE } from '../billing/data/invoice-list-port';
 import { loadInvoiceReadState } from '../billing/data/invoice-read-flow';
+import { readPatientName } from '../billing/data/patient-name-http';
 import { createInvoiceReadState } from '../billing/data/invoice-read-state';
 import { loadInvoiceDetailReadState } from '../billing/data/invoice-detail-read-flow';
 import {
@@ -105,6 +106,7 @@ export const BILLING_INITIAL_MODE = new InjectionToken<'demo' | 'http'>('billing
     @if (useHttpInvoiceDetail()) {
       <dlc-invoice-detail-http-page
         [readState]="displayedInvoiceDetailReadState()"
+        [patientName]="patientNameForDetail()"
         [correctionContext]="correctionContext" [canCorrectPrices]="canManagePrices()"
         (priceCorrected)="loadInvoiceDetail($event)"
         [canIssueInvoices]="canIssueInvoices()"
@@ -133,6 +135,7 @@ export const BILLING_INITIAL_MODE = new InjectionToken<'demo' | 'http'>('billing
     @if (useHttpPaymentForm()) {
       <dlc-invoice-payment-http-page
         [readState]="displayedPaymentInvoiceReadState()"
+        [patientName]="patientNameForDetail()"
         [canRecordPayments]="canRecordPayments()"
         [recording]="recordingPayment()"
         (record)="requestPaymentRegistration($event)"
@@ -237,6 +240,7 @@ export class BillingCompositionRoot {
     this.priceAttempt = undefined;
     this.extraRuleAttempt = undefined;
     this.invoiceReadState.set(createInvoiceReadState());
+    this.patientNames.set({});
     this.invoiceDetailReadState.set(createInvoiceDetailReadState());
     this.invoiceMeta.set(null); this.priceMeta.set(null); this.ruleMeta.set(null);
     this.procedurePricesReadState.set({ status: 'idle', prices: [] });
@@ -276,6 +280,7 @@ export class BillingCompositionRoot {
 
   readonly session = signal(this.context.session.getSnapshot());
   readonly invoiceReadState = signal(createInvoiceReadState());
+  readonly patientNames = signal<Readonly<Record<string, string>>>({});
   readonly invoiceDetailReadState = signal(createInvoiceDetailReadState());
   private paymentHistoryGeneration = 0;
   readonly paymentHistoryState = signal<PaymentHistoryViewState>({
@@ -318,9 +323,21 @@ export class BillingCompositionRoot {
 
   readonly displayedInvoices = computed(() =>
     this.invoiceListMode() === 'http'
-      ? this.invoiceReadState().invoices
+      ? this.invoiceReadState().invoices.map(invoice => ({ ...invoice, patientName: this.patientNames()[invoice.patientName] ?? invoice.patientName }))
       : this.invoices,
   );
+  readonly patientNameForDetail = computed(() => {
+    const id = this.invoiceDetailReadState().invoice?.patientId;
+    return id ? this.patientNames()[id] : undefined;
+  });
+
+  private async resolvePatientNames(ids: readonly string[], current: () => boolean): Promise<void> {
+    const missing = [...new Set(ids)].filter(id => !this.patientNames()[id]);
+    await Promise.all(missing.map(async id => {
+      const name = await readPatientName(this.context, id);
+      if (name && current()) this.patientNames.update(names => ({ ...names, [id]: name }));
+    }));
+  }
 
   readonly displayedReadStatus = computed(() =>
     this.invoiceListMode() === 'http'
@@ -362,7 +379,7 @@ export class BillingCompositionRoot {
 
     const generation = ++this.invoiceRequestGeneration;
 
-    await loadInvoiceReadState(
+    const state = await loadInvoiceReadState(
       this.context,
       this.invoiceReadState(),
       state => {
@@ -373,6 +390,10 @@ export class BillingCompositionRoot {
       page,
       meta => { if (accessCurrent() && generation === this.invoiceRequestGeneration) this.invoiceMeta.set(meta); },
     );
+    if (state.status === 'success' && accessCurrent() && generation === this.invoiceRequestGeneration) {
+      void this.resolvePatientNames(state.invoices.map(invoice => invoice.patientName),
+        () => accessCurrent() && generation === this.invoiceRequestGeneration);
+    }
   }
 
   async loadProcedurePrices(page?: number): Promise<void> {
@@ -565,7 +586,7 @@ export class BillingCompositionRoot {
 
     const generation = ++this.invoiceDetailRequestGeneration;
 
-    await loadInvoiceDetailReadState(
+    const state = await loadInvoiceDetailReadState(
       this.context,
       invoiceId,
       this.invoiceDetailReadState(),
@@ -575,6 +596,10 @@ export class BillingCompositionRoot {
         }
       },
     );
+    if (state.invoice && accessCurrent() && generation === this.invoiceDetailRequestGeneration) {
+      void this.resolvePatientNames([state.invoice.patientId],
+        () => accessCurrent() && generation === this.invoiceDetailRequestGeneration);
+    }
   }
 
   async syncInvoiceRoute(): Promise<void> {
@@ -862,7 +887,9 @@ export class BillingCompositionRoot {
               : 'No se pudo registrar el pago. Revise los datos e inténtelo nuevamente.';
 
         this.paymentRegistrationMessage.set(message);
-        this.context.reportFailure({ code: 'PORTAL_TASK_FAILED' });
+        if (!(error instanceof PaymentRegistrationHttpError)) {
+          this.context.reportFailure({ code: 'PORTAL_TASK_FAILED' });
+        }
       }
     } finally {
       if (!this.isInactive()) {

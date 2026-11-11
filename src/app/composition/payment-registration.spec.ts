@@ -109,7 +109,7 @@ it('registers a payment through the shared HTTP client using the actual invoice 
 
     await root.registerPayment(paymentIntent);
 
-    expect(request).toHaveBeenCalledTimes(2);
+    expect(request).toHaveBeenCalledTimes(3);
 
     expect(request).toHaveBeenNthCalledWith(1, {
       method: 'POST',
@@ -134,6 +134,19 @@ it('registers a payment through the shared HTTP client using the actual invoice 
     expect(root.payments.read()).toEqual(before);
     expect(root.displayedPaymentInvoiceReadState().invoice?.balance)
       .toBe('50000.00');
+  } finally {
+    injector.destroy();
+  }
+});
+
+it.each([400, 403, 409, 503])('keeps the payment form available when the API returns %s', async status => {
+  const { root, injector, request, reportFailure } = setup();
+  try {
+    request.mockResolvedValueOnce({ ok: false, status, error: 'VALIDATION_ERROR' });
+    await root.registerPayment(paymentIntent);
+    expect(root.paymentRegistrationMessage()).not.toBe('');
+    expect(root.recordingPayment()).toBe(false);
+    expect(reportFailure).not.toHaveBeenCalled();
   } finally {
     injector.destroy();
   }

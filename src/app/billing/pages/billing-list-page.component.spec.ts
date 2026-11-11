@@ -244,7 +244,7 @@ describe('BillingListPageComponent', () => {
     component.canNavigateToInvoice = true;
 
     expect(component.showDemoSummary).toBe(false);
-    expect(component.patientColumnLabel).toBe('ID del paciente');
+    expect(component.patientColumnLabel).toBe('Paciente');
   });
 
   it('identifies patient references without claiming they are names', () => {
@@ -259,7 +259,7 @@ describe('BillingListPageComponent', () => {
       },
     ];
 
-    expect(component.patientColumnLabel).toBe('ID del paciente');
+    expect(component.patientColumnLabel).toBe('Paciente');
     expect(component.displayPatient(component.invoices[0])).toBe(
       'patient-001',
     );
