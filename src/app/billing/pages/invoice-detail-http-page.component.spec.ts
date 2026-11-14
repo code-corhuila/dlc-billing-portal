@@ -352,3 +352,108 @@ it('does not emit payment navigation without a loaded invoice', () => {
   expect(page.canPay).toBe(false);
   expect(pay).not.toHaveBeenCalled();
 });
+
+
+it('allows authorized payment history access for the selected invoice', () => {
+  const page = setup(invoiceDetailReadSuccess(invoice));
+  page.canReadPaymentHistory = true;
+
+  const read = vi.fn();
+  page.readPaymentHistory.subscribe(read);
+
+  page.requestPaymentHistory();
+
+  expect(read).toHaveBeenCalledExactlyOnceWith({
+    invoiceId: invoice.id,
+    page: 1,
+  });
+});
+
+it('blocks payment history requests without authorization or invoice', () => {
+  const page = setup(invoiceDetailReadSuccess(invoice));
+  const read = vi.fn();
+  page.readPaymentHistory.subscribe(read);
+
+  page.requestPaymentHistory();
+  expect(read).not.toHaveBeenCalled();
+
+  page.canReadPaymentHistory = true;
+  page.readState = createInvoiceDetailReadState();
+  page.requestPaymentHistory();
+
+  expect(read).not.toHaveBeenCalled();
+});
+
+it('never displays payments belonging to another invoice', () => {
+  const page = setup(invoiceDetailReadSuccess(invoice));
+  page.canReadPaymentHistory = true;
+  page.paymentHistory = {
+    status: 'success',
+    invoiceId: '44444444-4444-4444-8444-444444444444',
+    data: [{
+      id: '55555555-5555-4555-8555-555555555555',
+      invoiceId: '44444444-4444-4444-8444-444444444444',
+      amount: copMoney('25000.00'),
+      method: 'CASH',
+      recordedBy: '66666666-6666-4666-8666-666666666666',
+      recordedAt: '2026-11-01T14:00:00Z',
+      version: 1,
+    }],
+    meta: { page: 1, limit: 20, total: 1, totalPages: 1 },
+  };
+
+  expect(page.displayedPaymentHistory).toEqual([]);
+});
+
+it('displays validated payments and supports pagination', () => {
+  const page = setup(invoiceDetailReadSuccess(invoice));
+  page.canReadPaymentHistory = true;
+  page.paymentHistory = {
+    status: 'success',
+    invoiceId: invoice.id,
+    data: [{
+      id: '55555555-5555-4555-8555-555555555555',
+      invoiceId: invoice.id,
+      amount: copMoney('25000.01'),
+      method: 'CASH',
+      recordedBy: '66666666-6666-4666-8666-666666666666',
+      recordedAt: '2026-11-01T14:00:00Z',
+      version: 1,
+    }],
+    meta: { page: 1, limit: 20, total: 21, totalPages: 2 },
+  };
+
+  expect(page.displayedPaymentHistory).toHaveLength(1);
+  expect(page.formatPaymentAmount(
+    page.displayedPaymentHistory[0].amount,
+  )).toBe('25.000,01');
+
+  const read = vi.fn();
+  page.readPaymentHistory.subscribe(read);
+  page.requestPaymentHistoryPage(2);
+
+  expect(read).toHaveBeenCalledExactlyOnceWith({
+    invoiceId: invoice.id,
+    page: 2,
+  });
+});
+
+it('blocks invalid pagination and requests while loading', () => {
+  const page = setup(invoiceDetailReadSuccess(invoice));
+  page.canReadPaymentHistory = true;
+  page.paymentHistory = {
+    status: 'loading',
+    invoiceId: invoice.id,
+    data: [],
+    meta: { page: 1, limit: 20, total: 0, totalPages: 0 },
+  };
+
+  const read = vi.fn();
+  page.readPaymentHistory.subscribe(read);
+
+  page.requestPaymentHistoryPage(0);
+  page.requestPaymentHistoryPage(2);
+
+  expect(read).not.toHaveBeenCalled();
+});
+
