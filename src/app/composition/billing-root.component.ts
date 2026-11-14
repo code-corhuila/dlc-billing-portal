@@ -4,7 +4,10 @@ import { BillingListPageComponent } from '../billing/pages/billing-list-page.com
 import { INVOICE_LIST_SOURCE } from '../billing/data/invoice-list-source';
 import { loadInvoiceReadState } from '../billing/data/invoice-read-flow';
 import { createInvoiceReadState } from '../billing/data/invoice-read-state';
+import { loadInvoiceDetailReadState } from '../billing/data/invoice-detail-read-flow';
+import { createInvoiceDetailReadState } from '../billing/data/invoice-detail-read-state';
 import { InvoiceDetailPageComponent } from '../billing/pages/invoice-detail-page.component';
+import { InvoiceDetailHttpPageComponent } from '../billing/pages/invoice-detail-http-page.component';
 import { PricingCatalogComponent } from '../billing/catalog/pages/pricing-catalog/pricing-catalog.component';
 import { DemoInvoicePayments } from '../billing/data/demo-invoice-payments';
 import { InvoicePaymentPageComponent } from '../billing/pages/invoice-payment-page.component';
@@ -14,14 +17,25 @@ export const BILLING_CONTEXT = new InjectionToken<PortalContext>('billing.contex
 @Component({
   selector: 'dlc-billing-root',
   standalone: true,
-  imports: [BillingListPageComponent, InvoiceDetailPageComponent, PricingCatalogComponent, InvoicePaymentPageComponent],
+  imports: [
+    BillingListPageComponent,
+    InvoiceDetailPageComponent,
+    InvoiceDetailHttpPageComponent,
+    PricingCatalogComponent,
+    InvoicePaymentPageComponent,
+  ],
   template: `@if (isInvoiceList()) {
     <dlc-billing-list-page [composed]="true" [readOnly]="invoiceListMode() === 'http'"
       [readStatus]="displayedReadStatus()" [invoices]="displayedInvoices()"
       (openInvoice)="openInvoice($event)" />
   } @else if (isInvoiceDetail()) {
-    <dlc-invoice-detail-page [invoice]="selectedInvoice()" [canPay]="canRecordPayments()"
-      (pay)="openPayment($event)" (back)="backToList()" />
+    @if (useHttpInvoiceDetail()) {
+      <dlc-invoice-detail-http-page [readState]="displayedInvoiceDetailReadState()"
+        (back)="backToList()" />
+    } @else {
+      <dlc-invoice-detail-page [invoice]="selectedInvoice()" [canPay]="canRecordPayments()"
+        (pay)="openPayment($event)" (back)="backToList()" />
+    }
   } @else if (isPaymentRoute()) {
     <dlc-invoice-payment-page [session]="payments" [invoiceId]="selectedInvoice()?.id ?? ''"
       [canPay]="canRecordPayments()" (back)="backToList()" />
@@ -37,11 +51,13 @@ export class BillingCompositionRoot {
   private readonly destroyRef = inject(DestroyRef);
   private navigationGeneration = 0;
   private invoiceRequestGeneration = 0;
+  private invoiceDetailRequestGeneration = 0;
   private pendingInvoice?: string;
   private readonly source = inject(INVOICE_LIST_SOURCE);
 
   readonly session = signal(this.context.session.getSnapshot());
   readonly invoiceReadState = signal(createInvoiceReadState());
+  readonly invoiceDetailReadState = signal(createInvoiceDetailReadState());
   readonly invoiceListMode = signal<'demo' | 'http'>('demo');
 
   readonly displayedInvoices = computed(() =>
@@ -86,6 +102,23 @@ export class BillingCompositionRoot {
     );
   }
 
+  async loadInvoiceDetail(invoiceId: string): Promise<void> {
+    if (this.isInactive()) return;
+
+    const generation = ++this.invoiceDetailRequestGeneration;
+
+    await loadInvoiceDetailReadState(
+      this.context,
+      invoiceId,
+      this.invoiceDetailReadState(),
+      state => {
+        if (!this.isInactive() && generation === this.invoiceDetailRequestGeneration) {
+          this.invoiceDetailReadState.set(state);
+        }
+      },
+    );
+  }
+
   readonly canRecordPayments = computed(() => this.session()?.state === 'authenticated'
     && this.session()?.user?.roles.some(role => ['ADMINISTRATOR', 'SECRETARY_ASSISTANT'].includes(role)) === true);
   readonly isInvoiceList = computed(() => this.route().localPath === '/');
@@ -104,8 +137,30 @@ export class BillingCompositionRoot {
     try { return decodeURIComponent(match[1]); } catch { return undefined; }
   });
 
-  readonly isPaymentRoute = computed(() => this.invoiceId() !== undefined && this.route().localPath.endsWith('/payment'));
-  readonly isInvoiceDetail = computed(() => this.invoiceId() !== undefined && !this.isPaymentRoute());
+  readonly isPaymentRoute = computed(() =>
+    this.invoiceId() !== undefined && this.route().localPath.endsWith('/payment'));
+
+  readonly isInvoiceDetail = computed(() =>
+    this.invoiceId() !== undefined && !this.isPaymentRoute());
+
+  readonly useHttpInvoiceDetail = computed(() =>
+    this.isInvoiceDetail() && this.invoiceListMode() === 'http');
+
+  readonly displayedInvoiceDetailReadState = computed(() => {
+    if (!this.useHttpInvoiceDetail()) {
+      return createInvoiceDetailReadState();
+    }
+
+    const state = this.invoiceDetailReadState();
+    const routeInvoiceId = this.invoiceId();
+
+    if (state.invoice?.id !== undefined && state.invoice.id !== routeInvoiceId) {
+      return createInvoiceDetailReadState();
+    }
+
+    return state;
+  });
+
   readonly selectedInvoice = computed(() => {
     const id = this.invoiceId();
     return id === undefined ? undefined : this.payments.detail(id);
@@ -127,7 +182,9 @@ export class BillingCompositionRoot {
   }
 
   async openPayment(id: string): Promise<void> {
-    if (this.canRecordPayments()) await this.navigate(`${this.route().basePath}/invoices/${encodeURIComponent(id)}/payment`);
+    if (this.canRecordPayments()) {
+      await this.navigate(`${this.route().basePath}/invoices/${encodeURIComponent(id)}/payment`);
+    }
   }
 
   private async navigate(path: string): Promise<void> {
@@ -145,7 +202,9 @@ export class BillingCompositionRoot {
       this.navigationMessage.set('No se pudo completar la navegación.');
       this.context.reportFailure({ code: 'PORTAL_TASK_FAILED' });
     } finally {
-      if (!this.isInactive() && generation === this.navigationGeneration) this.pendingInvoice = undefined;
+      if (!this.isInactive() && generation === this.navigationGeneration) {
+        this.pendingInvoice = undefined;
+      }
     }
   }
 
