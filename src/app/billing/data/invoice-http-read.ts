@@ -1,3 +1,4 @@
+import { pageQuery } from './pagination';
 import type { PortalContext } from '../../shell-contract';
 import {
   readInvoiceDetail,
@@ -8,6 +9,8 @@ import {
 
 export async function readInvoicesHttp(
   context: Pick<PortalContext, 'http' | 'signal'>,
+  page?: number,
+  limit = 20,
 ): Promise<ReadInvoicePage> {
   if (context.signal.aborted) {
     throw new Error('Invoice request cancelled');
@@ -15,7 +18,7 @@ export async function readInvoicesHttp(
 
   const result = await context.http.request({
     method: 'GET',
-    path: '/api/v1/invoices',
+    path: `/api/v1/invoices${page === undefined ? '' : pageQuery(page, limit)}`,
     signal: context.signal,
   });
 

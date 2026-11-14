@@ -51,7 +51,7 @@ const invoiceResponse = (id: string) => ({
       status: 'ISSUED',
       version: 1,
     }],
-    meta: {},
+    meta: { page: 1, limit: 20, total: 1, totalPages: 1 },
   },
 });
 
