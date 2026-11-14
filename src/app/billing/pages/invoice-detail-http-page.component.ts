@@ -51,6 +51,16 @@ export interface InvoiceIssuanceIntent {
               {{ issuing ? 'Emitiendo factura...' : 'Emitir factura' }}
             </button>
           }
+
+          @if (canDownloadPdfInvoices && invoice.status === 'ISSUED') {
+            <button
+              type="button"
+              [disabled]="!canDownloadPdf"
+              (click)="requestPdfDownload()"
+            >
+              {{ downloadingPdf ? 'Descargando PDF...' : 'Descargar PDF' }}
+            </button>
+          }
         </article>
       } @else {
         <p role="status">{{ statusMessage }}</p>
@@ -62,9 +72,12 @@ export class InvoiceDetailHttpPageComponent {
   @Input() readState: InvoiceDetailReadState = createInvoiceDetailReadState();
   @Input() canIssueInvoices = false;
   @Input() issuing = false;
+  @Input() canDownloadPdfInvoices = false;
+  @Input() downloadingPdf = false;
 
   @Output() readonly back = new EventEmitter<void>();
   @Output() readonly issue = new EventEmitter<InvoiceIssuanceIntent>();
+  @Output() readonly downloadPdf = new EventEmitter<string>();
 
   get selectedInvoice(): ReadInvoice | undefined {
     return this.readState.status === 'success'
@@ -76,6 +89,12 @@ export class InvoiceDetailHttpPageComponent {
     return this.canIssueInvoices
       && !this.issuing
       && this.selectedInvoice?.status === 'DRAFT';
+  }
+
+  get canDownloadPdf(): boolean {
+    return this.canDownloadPdfInvoices
+      && !this.downloadingPdf
+      && this.selectedInvoice?.status === 'ISSUED';
   }
 
   requestIssuance(): void {
@@ -92,6 +111,19 @@ export class InvoiceDetailHttpPageComponent {
       invoiceId: invoice.id,
       expectedVersion: invoice.version,
     });
+  }
+
+  requestPdfDownload(): void {
+    if (!this.canDownloadPdf) {
+      return;
+    }
+
+    const invoice = this.selectedInvoice;
+    if (!invoice) {
+      return;
+    }
+
+    this.downloadPdf.emit(invoice.id);
   }
 
   get displayNumber(): string {
