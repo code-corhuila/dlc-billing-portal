@@ -17,11 +17,16 @@
         Reglas adicionales
       </a> }
 
-      @if (!composed) {
-      <button #newPriceButton type="button" class="primary-button" [disabled]="!canManagePrices || submitting()" (click)="openForm()">
-        + Nuevo procedimiento
-      </button>
-      }
+     @if (canManagePrices) {
+<button
+  #newPriceButton
+  type="button"
+  class="primary-button"
+  [disabled]="submitting() || creatingHttpPrice"
+  (click)="openForm()">
+  + Nuevo procedimiento
+</button>
+}
 
     </div>
 
@@ -153,8 +158,8 @@
 
   }
 
-  @if (!composed) {
-    <dialog #priceDialog class="modal" aria-labelledby="new-price-title" (cancel)="$event.preventDefault(); closeForm()">
+@if (!composed || canManagePrices) {
+  <dialog #priceDialog class="modal" aria-labelledby="new-price-title" (cancel)="$event.preventDefault(); closeForm()">
       <header class="modal-header">
 
         <div>
