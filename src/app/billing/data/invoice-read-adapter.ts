@@ -54,7 +54,7 @@ function requireString(value: unknown, field: string): string {
   return value;
 }
 
-function readBillableItem(value: unknown): ReadBillableItem {
+export function readBillableItem(value: unknown): ReadBillableItem {
   if (!isRecord(value)) {
     throw new Error('Invalid billable item');
   }
