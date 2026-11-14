@@ -1,12 +1,13 @@
 import { Component, DestroyRef, InjectionToken, computed, inject, signal, viewChild } from '@angular/core';
-import { PortalContext } from '../shell-contract';
+import { PortalContext, PortalRoute } from '../shell-contract';
+import { manualChargeSource } from '../billing/data/manual-charge-source';
 import { ManualChargeFormComponent } from '../billing/pages/manual-charge-form.component';
 import {
   recordManualChargeHttp,
   type RecordManualChargeRequest,
 } from '../billing/data/manual-charge-http';
 import { BillingListPageComponent } from '../billing/pages/billing-list-page.component';
-import { INVOICE_LIST_SOURCE } from '../billing/data/invoice-list-source';
+import { INVOICE_LIST_SOURCE } from '../billing/data/invoice-list-port';
 import { loadInvoiceReadState } from '../billing/data/invoice-read-flow';
 import { createInvoiceReadState } from '../billing/data/invoice-read-state';
 import { loadInvoiceDetailReadState } from '../billing/data/invoice-detail-read-flow';
@@ -46,6 +47,9 @@ import {
 } from '../billing/catalog/data/procedure-prices-http';
 import {
   readExtraChargeRulesHttp,
+  createExtraChargeRuleHttp,
+  ExtraChargeRuleCreationError,
+  type CreateHttpExtraChargeRuleRequest,
   type HttpExtraChargeRule,
 } from '../billing/catalog/data/extra-charge-rules-http';
 import { DemoInvoicePayments } from '../billing/data/demo-invoice-payments';
@@ -53,6 +57,7 @@ import { InvoicePaymentPageComponent } from '../billing/pages/invoice-payment-pa
 import { InvoicePaymentHttpPageComponent } from '../billing/pages/invoice-payment-http-page.component';
 
 export const BILLING_CONTEXT = new InjectionToken<PortalContext>('billing.context');
+export const BILLING_INITIAL_MODE = new InjectionToken<'demo' | 'http'>('billing.initial-mode');
 
 @Component({
   selector: 'dlc-billing-root',
@@ -127,7 +132,7 @@ export const BILLING_CONTEXT = new InjectionToken<PortalContext>('billing.contex
       <section aria-label="Cargo manual no disponible">
         <h1>Registro de cargo manual</h1>
         <p role="status">
-          No hay una fuente clínica autorizada seleccionada.
+          No hay una fuente clínica seleccionada.
         </p>
       </section>
     }
@@ -149,7 +154,11 @@ export const BILLING_CONTEXT = new InjectionToken<PortalContext>('billing.contex
     <dlc-extra-charge-rules
       [composed]="true"
       [httpRules]="extraChargeRulesReadState().rules"
-      [httpReadStatus]="extraChargeRulesReadState().status" />
+      [httpReadStatus]="extraChargeRulesReadState().status"
+      [canManageRules]="canManagePrices()" [creatingHttpRule]="creatingExtraChargeRule()"
+      [savedHttpRule]="createdExtraChargeRule()" [creationMessage]="extraChargeRuleMessage()"
+      (createRule)="requestExtraChargeRuleCreation($event)" />
+    @if (extraChargeRuleMessage()) { <p role="status">{{ extraChargeRuleMessage() }}</p> }
   } @else {
     <section aria-label="Billing"><h1 tabindex="-1">{{ title() }}</h1>
       <p role="status">{{ message() }}</p></section>
@@ -186,13 +195,18 @@ export class BillingCompositionRoot {
     status: 'idle' | 'loading' | 'success' | 'error';
     prices: HttpProcedurePrice[];
   }>({ status: 'idle', prices: [] });
+  private extraRuleAttempt?: { actor: string; fingerprint: string; key: string };
+  readonly creatingExtraChargeRule = signal(false);
+  readonly createdExtraChargeRule = signal<HttpExtraChargeRule | null>(null);
+  readonly extraChargeRuleMessage = signal('');
   readonly creatingPriceVersion = signal(false);
   readonly priceVersionMessage = signal('');
   readonly extraChargeRulesReadState = signal<{
     status: 'idle' | 'loading' | 'success' | 'error';
     rules: HttpExtraChargeRule[];
   }>({ status: 'idle', rules: [] });
-  readonly invoiceListMode = signal<'demo' | 'http'>('demo');
+  readonly invoiceListMode = signal<'demo' | 'http'>(
+    inject(BILLING_INITIAL_MODE, { optional: true }) ?? 'demo');
   readonly issuingInvoice = signal(false);
   readonly issuanceMessage = signal('');
   readonly downloadingPdf = signal(false);
@@ -203,7 +217,7 @@ export class BillingCompositionRoot {
     appointmentId: string;
     procedureId: string;
     sourceRecordId: string;
-  }> | null>(null);
+  }> | null>(manualChargeSource(this.context.route));
 
   readonly recordingManualCharge = signal(false);
   readonly manualChargeMessage = signal('');
@@ -232,6 +246,18 @@ export class BillingCompositionRoot {
   }
 
   readonly route = signal(this.context.route);
+  setRoute(route: PortalRoute): void {
+    const next = manualChargeSource(route);
+    const current = this.manualChargeContext();
+    if (current?.patientId !== next?.patientId || current?.appointmentId !== next?.appointmentId
+      || current?.procedureId !== next?.procedureId || current?.sourceRecordId !== next?.sourceRecordId) {
+      this.manualChargePage()?.resetForSource();
+      this.manualChargeContext.set(next);
+      this.manualChargeMessage.set('');
+      this.recordingManualCharge.set(false);
+    }
+    this.route.set(route);
+  }
   readonly payments = new DemoInvoicePayments(this.source);
 
   get invoices() { return this.payments.read(); }
@@ -323,21 +349,62 @@ export class BillingCompositionRoot {
     void this.createPriceVersion(request, crypto.randomUUID());
   }
 
+  async requestExtraChargeRuleCreation(request: CreateHttpExtraChargeRuleRequest): Promise<void> {
+    const actor = this.session()?.user?.id;
+    if (!actor || this.isInactive() || !this.isExtraChargeRules()
+      || !this.canManagePrices() || this.creatingExtraChargeRule()) return;
+    const body: CreateHttpExtraChargeRuleRequest = {
+      code: request.code, itemType: request.itemType, unitPrice: request.unitPrice,
+      requiresApproval: request.requiresApproval, validFrom: request.validFrom,
+    };
+    const fingerprint = JSON.stringify(body);
+    if (this.extraRuleAttempt?.actor !== actor || this.extraRuleAttempt.fingerprint !== fingerprint) {
+      this.extraRuleAttempt = { actor, fingerprint, key: crypto.randomUUID() };
+    }
+    const attempt = this.extraRuleAttempt;
+    const isCurrent = () => !this.isInactive() && this.isExtraChargeRules()
+      && this.canManagePrices() && this.session()?.user?.id === actor;
+    this.extraChargeRuleMessage.set('');
+    this.createdExtraChargeRule.set(null);
+    this.creatingExtraChargeRule.set(true);
+    try {
+      const rule = await createExtraChargeRuleHttp(this.context, body, attempt.key);
+      if (!isCurrent()) return;
+      this.extraRuleAttempt = undefined;
+      this.createdExtraChargeRule.set(rule);
+      await this.loadExtraChargeRules();
+      if (isCurrent()) {
+        this.extraChargeRuleMessage.set(this.extraChargeRulesReadState().status === 'success'
+          ? 'Versión de regla registrada correctamente.'
+          : 'Regla registrada, pero no se pudo actualizar el catálogo.');
+      }
+    } catch (error) {
+      if (isCurrent()) {
+        this.extraChargeRuleMessage.set(error instanceof ExtraChargeRuleCreationError && error.status === 409
+          ? 'No se pudo registrar la regla por un conflicto. Revise su código y fecha de vigencia.'
+          : 'No se pudo confirmar el registro. Reintente con los mismos datos.');
+        this.context.reportFailure?.({ code: 'PORTAL_TASK_FAILED' });
+      }
+    } finally {
+      if (!this.isInactive()) this.creatingExtraChargeRule.set(false);
+    }
+  }
+
   async loadExtraChargeRules(): Promise<void> {
-    if (this.isInactive() || !this.isExtraChargeRules()) return;
-
+    const actor = this.session()?.user?.id;
+    const canRead = () => this.session()?.state === 'authenticated'
+      && this.session()?.user?.id === actor
+      && this.session()?.user?.roles.some(role => ['ADMINISTRATOR', 'SECRETARY_ASSISTANT'].includes(role)) === true;
+    if (this.isInactive() || !this.isExtraChargeRules() || !canRead()) return;
     const generation = ++this.extraChargeRulesRequestGeneration;
+    const isCurrent = () => !this.isInactive() && this.isExtraChargeRules() && canRead()
+      && generation === this.extraChargeRulesRequestGeneration;
     this.extraChargeRulesReadState.set({ status: 'loading', rules: [] });
-
     try {
       const result = await readExtraChargeRulesHttp(this.context);
-      if (this.isInactive() || !this.isExtraChargeRules()
-        || generation !== this.extraChargeRulesRequestGeneration) return;
-      this.extraChargeRulesReadState.set({ status: 'success', rules: result.data });
+      if (isCurrent()) this.extraChargeRulesReadState.set({ status: 'success', rules: result.data });
     } catch {
-      if (this.isInactive() || !this.isExtraChargeRules()
-        || generation !== this.extraChargeRulesRequestGeneration) return;
-      this.extraChargeRulesReadState.set({ status: 'error', rules: [] });
+      if (isCurrent()) this.extraChargeRulesReadState.set({ status: 'error', rules: [] });
     }
   }
 
@@ -470,6 +537,7 @@ export class BillingCompositionRoot {
   readonly isProcedures = computed(() => this.route().localPath === '/procedures');
   readonly isExtraChargeRules = computed(() => this.route().localPath === '/procedures/rules');
   readonly catalog = viewChild(PricingCatalogComponent);
+  readonly ruleCatalog = viewChild(ExtraChargeRulesComponent);
   readonly paymentPage = viewChild(InvoicePaymentPageComponent);
   readonly httpPaymentPage = viewChild(InvoicePaymentHttpPageComponent);
   readonly manualChargePage = viewChild(ManualChargeFormComponent);
@@ -482,7 +550,8 @@ export class BillingCompositionRoot {
     const manualSafe =
       !this.manualChargePage()?.dirty && !this.recordingManualCharge();
     return catalogSafe && demoSafe && httpSafe && manualSafe
-      && !this.creatingPriceVersion();
+      && !this.creatingPriceVersion() && !this.creatingExtraChargeRule()
+      && !this.ruleCatalog()?.creationDirty;
   }
 
   private readonly invoiceId = computed(() => {
@@ -697,7 +766,7 @@ export class BillingCompositionRoot {
     if (
       readState.status !== 'success'
       || !invoice
-      || invoice.status !== 'ISSUED'
+      || !['ISSUED', 'PARTIALLY_PAID', 'PAID'].includes(invoice.status)
       || invoice.id !== invoiceId
       || invoice.id !== this.invoiceId()
     ) {

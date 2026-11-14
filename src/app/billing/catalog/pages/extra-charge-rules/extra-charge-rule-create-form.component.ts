@@ -36,6 +36,7 @@ import type { CreateHttpExtraChargeRuleRequest, ExtraChargeItemType, HttpExtraCh
           <input name="validFrom" type="datetime-local" step="1" required
             [(ngModel)]="form.validFrom" [disabled]="creating" />
         </label>
+        @if (message) { <p role="alert">{{ message }}</p> }
         <footer>
           <button type="button" [disabled]="creating" (click)="close()">Cancelar</button>
           <button type="submit" class="primary" [disabled]="creating || !valid">
@@ -65,6 +66,7 @@ export class ExtraChargeRuleCreateFormComponent {
   private allowed = false;
   @ViewChild('dialog') dialog?: ElementRef<HTMLDialogElement>;
   @Input() creating = false;
+  @Input() message = '';
   @Input() set canManageRules(value: boolean) {
     this.allowed = value;
     if (!value) this.resetAndClose();
