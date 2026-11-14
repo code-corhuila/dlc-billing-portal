@@ -3,6 +3,7 @@ import {
   Injector,
   reflectComponentType,
   runInInjectionContext,
+  ɵresolveComponentResources as resolveComponentResources,
 } from '@angular/core';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -228,7 +229,9 @@ describe('extra charge rules composition', () => {
     }
   });
 
-  it('registers the additional rules presentation in the compositor', () => {
+  it('registers the additional rules presentation in the compositor', async () => {
+    // This metadata-only check needs the external style resource resolved before reflection.
+    await resolveComponentResources(() => Promise.resolve(''));
     const component = reflectComponentType(BillingCompositionRoot);
 
     expect(component).not.toBeNull();

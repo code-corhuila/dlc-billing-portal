@@ -154,7 +154,8 @@ export async function readPaymentHistoryHttp(
 
   const result = await context.http.request({
     method: 'GET',
-    path: `/api/v1/invoices/${encodeURIComponent(id)}/payments?page=${page}&limit=${limit}`,
+    path: `/api/v1/invoices/${encodeURIComponent(id)}/payments`,
+    query: { page: [String(page)], limit: [String(limit)] },
     signal: context.signal,
   });
 
