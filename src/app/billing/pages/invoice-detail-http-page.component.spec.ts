@@ -90,7 +90,7 @@ it('reports cancellation without presenting invoice data', () => {
   expect(page.statusMessage).toBe('La consulta de la factura fue cancelada.');
 });
 
-it('provides a back event without payment or issuance actions', () => {
+it('provides a back event without payment actions', () => {
   const page = setup();
   const back = vi.fn();
 
@@ -99,5 +99,104 @@ it('provides a back event without payment or issuance actions', () => {
 
   expect(back).toHaveBeenCalledOnce();
   expect('pay' in page).toBe(false);
-  expect('issue' in page).toBe(false);
+});
+
+it('does not allow issuance by default', () => {
+  const page = setup(invoiceDetailReadSuccess({
+    ...invoice,
+    status: 'DRAFT',
+  }));
+
+  expect(page.canIssue).toBe(false);
+});
+
+it('allows authorized issuance only for a loaded DRAFT invoice', () => {
+  const page = setup(invoiceDetailReadSuccess({
+    ...invoice,
+    status: 'DRAFT',
+  }));
+
+  page.canIssueInvoices = true;
+
+  expect(page.canIssue).toBe(true);
+});
+
+it('does not allow issuance of an already issued invoice', () => {
+  const page = setup(invoiceDetailReadSuccess({
+    ...invoice,
+    status: 'ISSUED',
+  }));
+
+  page.canIssueInvoices = true;
+
+  expect(page.canIssue).toBe(false);
+});
+
+it('does not allow issuance of a partially paid invoice', () => {
+  const page = setup(invoiceDetailReadSuccess(invoice));
+  page.canIssueInvoices = true;
+
+  expect(page.canIssue).toBe(false);
+});
+
+it('does not allow issuance without a successful invoice read', () => {
+  const page = setup();
+  page.canIssueInvoices = true;
+
+  expect(page.canIssue).toBe(false);
+});
+
+it('emits the loaded invoice id and version without changing invoice data', () => {
+  const draft = {
+    ...invoice,
+    status: 'DRAFT' as const,
+  };
+
+  const page = setup(invoiceDetailReadSuccess(draft));
+  page.canIssueInvoices = true;
+
+  const issue = vi.fn();
+  page.issue.subscribe(issue);
+
+  page.requestIssuance();
+
+  expect(issue).toHaveBeenCalledExactlyOnceWith({
+    invoiceId: draft.id,
+    expectedVersion: draft.version,
+  });
+
+  expect(draft.status).toBe('DRAFT');
+  expect(draft.version).toBe(3);
+});
+
+it('does not emit an issuance event when unauthorized', () => {
+  const page = setup(invoiceDetailReadSuccess({
+    ...invoice,
+    status: 'DRAFT',
+  }));
+
+  const issue = vi.fn();
+  page.issue.subscribe(issue);
+
+  page.requestIssuance();
+
+  expect(issue).not.toHaveBeenCalled();
+});
+
+it('does not emit duplicate issuance intents while submitting', () => {
+  const page = setup(invoiceDetailReadSuccess({
+    ...invoice,
+    status: 'DRAFT',
+  }));
+
+  page.canIssueInvoices = true;
+  page.issuing = true;
+
+  const issue = vi.fn();
+  page.issue.subscribe(issue);
+
+  page.requestIssuance();
+
+  expect(page.canIssue).toBe(false);
+  expect(issue).not.toHaveBeenCalled();
 });
