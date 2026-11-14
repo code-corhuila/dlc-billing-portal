@@ -339,11 +339,23 @@ export class BillingCompositionRoot {
 
     try {
       await recordPaymentHttp(this.context, request);
-      if (isCurrent()) {
-        this.paymentRegistrationMessage.set(
-          'Pago registrado. Actualice el detalle de la factura para consultar el saldo.',
-        );
-      }
+
+      if (!isCurrent()) return;
+
+      await this.loadInvoiceDetail(request.invoiceId);
+
+      if (!isCurrent()) return;
+
+      const refreshed = this.invoiceDetailReadState();
+      const updated = refreshed.status === 'success'
+        && refreshed.invoice?.id === request.invoiceId
+        && refreshed.invoice.version > request.expectedVersion;
+
+      this.paymentRegistrationMessage.set(
+        updated
+          ? 'Pago registrado. Saldo actualizado correctamente.'
+          : 'Pago registrado, pero no se pudo actualizar el detalle de la factura.',
+      );
     } catch (error: unknown) {
       if (isCurrent()) {
         const status = error instanceof PaymentRegistrationHttpError
