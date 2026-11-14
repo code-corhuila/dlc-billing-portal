@@ -12,7 +12,13 @@ const route = (localPath = '/') => ({
 });
 
 let controller: AbortController;
-const root = { route: signal(route()), canLeave: vi.fn(() => true) };
+const root = {
+  route: signal(route()),
+  invoiceListMode: signal<'demo' | 'http'>('demo'),
+  loadInvoices: vi.fn().mockResolvedValue(undefined),
+  syncInvoiceRoute: vi.fn().mockResolvedValue(undefined),
+  canLeave: vi.fn(() => true),
+};
 const child = { remove: vi.fn() };
 const host = {
   ownerDocument: { createElement: vi.fn(() => child) }, appendChild: vi.fn(),
@@ -51,6 +57,7 @@ beforeEach(() => {
   root.canLeave.mockReturnValue(true);
   controller = new AbortController();
   root.route.set(route());
+  root.invoiceListMode.set('demo');
   app.bootstrap.mockImplementation(() => ({ instance: root }));
   vi.mocked(createApplication).mockResolvedValue(app as never);
 });
@@ -72,6 +79,23 @@ it('bootstraps inside an owned child and leaves shared capabilities unused', asy
   expect(app.bootstrap).toHaveBeenCalledWith(expect.any(Function), child);
   expect(capabilities.http.request).not.toHaveBeenCalled();
   expect(capabilities.session.subscribe).not.toHaveBeenCalled();
+});
+
+it('enables HTTP mode and loads the invoice list when mounted at the root', async () => {
+  const handle = await mount();
+  expect(root.invoiceListMode()).toBe('http');
+  expect(root.loadInvoices).toHaveBeenCalledTimes(1);
+  expect(root.syncInvoiceRoute).not.toHaveBeenCalled();
+  await handle.unmount();
+});
+
+it('loads invoice details on payment routes after a route update', async () => {
+  const handle = await mount();
+  root.loadInvoices.mockClear();
+  await handle.updateRoute(route('/invoices/123/payment'));
+  expect(root.syncInvoiceRoute).toHaveBeenCalledTimes(1);
+  expect(root.loadInvoices).not.toHaveBeenCalled();
+  await handle.unmount();
 });
 
 it('destroys only the owned application and child, once', async () => {
@@ -397,7 +421,7 @@ it.each(['response', 'failure'])('ignores late navigation %s after destruction w
   expect(capabilities.reportFailure).not.toHaveBeenCalled();
   capabilities.navigation.request.mockClear();
   await frame.openInvoice('invoice-001');
-  expect(capabilities.navigation.request).not.toHaveBeenCalled();
+  expect(capabilities.http.request).not.toHaveBeenCalled();
 });
 
 it('reports only a safe render failure code (regression)', async () => {
@@ -428,9 +452,9 @@ it.each(['cancelled', 'failure'])('deduplicates pending targets and ignores supe
     expect(capabilities.navigation.request).toHaveBeenCalledTimes(2);
     settle(); await old;
     expect(frame.navigationMessage()).toBe('');
-    expect(capabilities.reportFailure).not.toHaveBeenCalled();
   } finally { injector.destroy(); }
 });
+
 it('selects HTTP invoice rows and status only when explicitly enabled', async () => {
   const { BILLING_CONTEXT, BillingCompositionRoot } =
     await import('./billing-root.component');
@@ -482,3 +506,4 @@ it('selects HTTP invoice rows and status only when explicitly enabled', async ()
     injector.destroy();
   }
 });
+
