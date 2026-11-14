@@ -15,6 +15,30 @@ export class InvoiceDraftHttpError extends Error {
   constructor(readonly status: number) { super('Invoice draft request failed'); }
 }
 
+export interface PatientOption { id: string; label: string }
+
+/** Patients-owned search (`GET /api/v1/patients`), active patients only; labels carry no contact data. */
+export async function searchPatientsHttp(
+  context: Pick<PortalContext, 'http' | 'signal'>, text: string,
+): Promise<PatientOption[]> {
+  if (context.signal.aborted) throw new Error('Cancelled request');
+  const result = await context.http.request({ method: 'GET', path: '/api/v1/patients',
+    query: { search: [text], status: ['ACTIVE'], page: ['1'], limit: ['10'] }, signal: context.signal });
+  if (context.signal.aborted) throw new Error('Cancelled request');
+  if (!result.ok) throw new InvoiceDraftHttpError(result.status);
+  const body = result.data as { data?: unknown } | null;
+  if (!body || !Array.isArray(body.data)) throw new Error('Invalid patient page');
+  return body.data.map(value => {
+    const patient = value as Record<string, unknown>;
+    if (typeof patient['id'] !== 'string' || !isUuid(patient['id']) || typeof patient['name'] !== 'string') {
+      throw new Error('Invalid patient');
+    }
+    const document = typeof patient['documentNumber'] === 'string'
+      ? ` — ${String(patient['documentType'] ?? '')} ${patient['documentNumber']}`.replace('—  ', '— ') : '';
+    return { id: patient['id'], label: `${patient['name']}${document}` };
+  });
+}
+
 export async function readUnbilledItemsHttp(
   context: Pick<PortalContext, 'http' | 'signal'>, patientId: string, page = 1,
 ): Promise<{ data: ReadBillableItem[]; meta: PageMeta }> {
