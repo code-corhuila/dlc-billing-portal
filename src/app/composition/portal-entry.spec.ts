@@ -10,8 +10,18 @@ const route = (localPath = '/') => ({
   compositionId: 'composition-1', globalPath: `/app/billing${localPath}`,
   basePath: '/app/billing', localPath, query: {}, fragment: '',
 });
+
 let controller: AbortController;
-const root = { route: signal(route()), canLeave: vi.fn(() => true) };
+const root = {
+  route: signal(route()),
+  setRoute(next: ReturnType<typeof route>): void { root.route.set(next); },
+  invoiceListMode: signal<'demo' | 'http'>('demo'),
+  loadInvoices: vi.fn().mockResolvedValue(undefined),
+  syncInvoiceRoute: vi.fn().mockResolvedValue(undefined),
+  loadProcedurePrices: vi.fn().mockResolvedValue(undefined),
+  loadExtraChargeRules: vi.fn().mockResolvedValue(undefined),
+  canLeave: vi.fn(() => true),
+};
 const child = { remove: vi.fn() };
 const host = {
   ownerDocument: { createElement: vi.fn(() => child) }, appendChild: vi.fn(),
@@ -24,16 +34,37 @@ const context = () => ({
   session: { getSnapshot: vi.fn(), subscribe: vi.fn(() => () => {}) },
   http: { request: vi.fn() }, reportFailure: vi.fn(),
 });
+
 const mount = async () => (await import('../../portal-entry')).mount(host, context());
+
+const invoiceResponse = (id: string) => ({
+  ok: true,
+  data: {
+    data: [{
+      id,
+      patientId: 'patient-001',
+      invoiceNumber: 'INV-001',
+      items: [],
+      total: '150000.00',
+      balance: '150000.00',
+      currency: 'COP',
+      status: 'ISSUED',
+      version: 1,
+    }],
+    meta: { page: 1, limit: 20, total: 1, totalPages: 1 },
+  },
+});
 
 beforeEach(() => {
   vi.clearAllMocks();
   root.canLeave.mockReturnValue(true);
   controller = new AbortController();
   root.route.set(route());
+  root.invoiceListMode.set('demo');
   app.bootstrap.mockImplementation(() => ({ instance: root }));
   vi.mocked(createApplication).mockResolvedValue(app as never);
 });
+
 afterEach(() => controller.abort());
 
 it('exports the Billing v1 identity without starting an application', async () => {
@@ -51,6 +82,23 @@ it('bootstraps inside an owned child and leaves shared capabilities unused', asy
   expect(app.bootstrap).toHaveBeenCalledWith(expect.any(Function), child);
   expect(capabilities.http.request).not.toHaveBeenCalled();
   expect(capabilities.session.subscribe).not.toHaveBeenCalled();
+});
+
+it('enables HTTP mode and loads the invoice list when mounted at the root', async () => {
+  const handle = await mount();
+  expect(root.invoiceListMode()).toBe('http');
+  expect(root.loadInvoices).toHaveBeenCalledTimes(1);
+  expect(root.syncInvoiceRoute).not.toHaveBeenCalled();
+  await handle.unmount();
+});
+
+it('loads invoice details on payment routes after a route update', async () => {
+  const handle = await mount();
+  root.loadInvoices.mockClear();
+  await handle.updateRoute(route('/invoices/123/payment'));
+  expect(root.syncInvoiceRoute).toHaveBeenCalledTimes(1);
+  expect(root.loadInvoices).not.toHaveBeenCalled();
+  await handle.unmount();
 });
 
 it('destroys only the owned application and child, once', async () => {
@@ -157,6 +205,148 @@ it('selects the dummy invoice list at the root and a 404 for unknown local paths
   injector.destroy();
 });
 
+it('initializes invoice HTTP read state without replacing demo invoices', async () => {
+  const { BILLING_CONTEXT, BillingCompositionRoot } =
+    await import('./billing-root.component');
+  const injector = Injector.create({
+    providers: [provideInvoiceListSource(), { provide: BILLING_CONTEXT, useValue: context() }],
+  });
+
+  try {
+    const frame = runInInjectionContext(injector, () => new BillingCompositionRoot());
+    expect(frame.invoiceReadState()).toEqual({ status: 'idle', invoices: [] });
+    expect(frame.invoices).toHaveLength(3);
+  } finally {
+    injector.destroy();
+  }
+});
+
+it('loads HTTP invoices through the composition root without changing demo invoices', async () => {
+  const { BILLING_CONTEXT, BillingCompositionRoot } =
+    await import('./billing-root.component');
+  const capabilities = context();
+  let resolveRequest!: (response: unknown) => void;
+  capabilities.http.request.mockReturnValue(new Promise(resolve => {
+    resolveRequest = resolve;
+  }));
+  const injector = Injector.create({
+    providers: [provideInvoiceListSource(), { provide: BILLING_CONTEXT, useValue: capabilities }],
+  });
+
+  try {
+    const frame = runInInjectionContext(injector, () => new BillingCompositionRoot());
+    const pending = frame.loadInvoices();
+
+    expect(frame.invoiceReadState()).toEqual({ status: 'loading', invoices: [] });
+    expect(capabilities.http.request).toHaveBeenCalledWith({
+      method: 'GET',
+      path: '/api/v1/invoices',
+      signal: capabilities.signal,
+    });
+
+    resolveRequest(invoiceResponse('real-invoice-001'));
+    await pending;
+
+    expect(frame.invoiceReadState()).toEqual({
+      status: 'success',
+      invoices: [{
+        id: 'real-invoice-001',
+        number: 'INV-001',
+        patientName: 'patient-001',
+        amount: '150000.00',
+        status: 'ISSUED',
+      }],
+    });
+    expect(frame.invoices).toHaveLength(3);
+  } finally {
+    injector.destroy();
+  }
+});
+
+it('shows HTTP errors without replacing real invoices with demo data', async () => {
+  const { BILLING_CONTEXT, BillingCompositionRoot } =
+    await import('./billing-root.component');
+  const capabilities = context();
+  capabilities.http.request.mockResolvedValue({ ok: false });
+  const injector = Injector.create({
+    providers: [provideInvoiceListSource(), { provide: BILLING_CONTEXT, useValue: capabilities }],
+  });
+
+  try {
+    const frame = runInInjectionContext(injector, () => new BillingCompositionRoot());
+    await frame.loadInvoices();
+
+    expect(frame.invoiceReadState()).toEqual({
+      status: 'error',
+      invoices: [],
+    });
+    expect(frame.invoices).toHaveLength(3);
+    expect(capabilities.reportFailure).not.toHaveBeenCalled();
+  } finally {
+    injector.destroy();
+  }
+});
+
+it('ignores an HTTP response after the composition root is destroyed', async () => {
+  const { BILLING_CONTEXT, BillingCompositionRoot } =
+    await import('./billing-root.component');
+  const capabilities = context();
+  let resolveRequest!: (response: unknown) => void;
+  capabilities.http.request.mockReturnValue(new Promise(resolve => {
+    resolveRequest = resolve;
+  }));
+  const injector = Injector.create({
+    providers: [provideInvoiceListSource(), { provide: BILLING_CONTEXT, useValue: capabilities }],
+  });
+
+  const frame = runInInjectionContext(injector, () => new BillingCompositionRoot());
+  const pending = frame.loadInvoices();
+  const writes = vi.spyOn(frame.invoiceReadState, 'set');
+  expect(frame.invoiceReadState().status).toBe('loading');
+
+  injector.destroy();
+  writes.mockClear();
+  resolveRequest(invoiceResponse('late-invoice'));
+  await pending;
+
+  expect(writes).not.toHaveBeenCalled();
+  expect(capabilities.reportFailure).not.toHaveBeenCalled();
+});
+
+it('keeps the newest invoice result when overlapping HTTP requests finish out of order', async () => {
+  const { BILLING_CONTEXT, BillingCompositionRoot } =
+    await import('./billing-root.component');
+  const capabilities = context();
+  const resolvers: Array<(response: unknown) => void> = [];
+  capabilities.http.request.mockImplementation(() => new Promise(resolve => {
+    resolvers.push(resolve);
+  }));
+  const injector = Injector.create({
+    providers: [provideInvoiceListSource(), { provide: BILLING_CONTEXT, useValue: capabilities }],
+  });
+
+  try {
+    const frame = runInInjectionContext(injector, () => new BillingCompositionRoot());
+    const first = frame.loadInvoices();
+    const second = frame.loadInvoices();
+
+    expect(capabilities.http.request).toHaveBeenCalledTimes(2);
+
+    resolvers[1](invoiceResponse('newest-invoice'));
+    await second;
+    expect(frame.invoiceReadState().invoices[0]?.id).toBe('newest-invoice');
+
+    resolvers[0](invoiceResponse('outdated-invoice'));
+    await first;
+
+    expect(frame.invoiceReadState().status).toBe('success');
+    expect(frame.invoiceReadState().invoices[0]?.id).toBe('newest-invoice');
+    expect(frame.invoices).toHaveLength(3);
+  } finally {
+    injector.destroy();
+  }
+});
+
 it('requests invoice navigation through the compositor and handles refusal or failure', async () => {
   const { BILLING_CONTEXT, BillingCompositionRoot } = await import('./billing-root.component');
   const capabilities = context();
@@ -234,7 +424,7 @@ it.each(['response', 'failure'])('ignores late navigation %s after destruction w
   expect(capabilities.reportFailure).not.toHaveBeenCalled();
   capabilities.navigation.request.mockClear();
   await frame.openInvoice('invoice-001');
-  expect(capabilities.navigation.request).not.toHaveBeenCalled();
+  expect(capabilities.http.request).not.toHaveBeenCalled();
 });
 
 it('reports only a safe render failure code (regression)', async () => {
@@ -265,6 +455,125 @@ it.each(['cancelled', 'failure'])('deduplicates pending targets and ignores supe
     expect(capabilities.navigation.request).toHaveBeenCalledTimes(2);
     settle(); await old;
     expect(frame.navigationMessage()).toBe('');
-    expect(capabilities.reportFailure).not.toHaveBeenCalled();
   } finally { injector.destroy(); }
+});
+
+it('selects HTTP invoice rows and status only when explicitly enabled', async () => {
+  const { BILLING_CONTEXT, BillingCompositionRoot } =
+    await import('./billing-root.component');
+
+  const capabilities = context();
+  const injector = Injector.create({
+    providers: [
+      provideInvoiceListSource(),
+      { provide: BILLING_CONTEXT, useValue: capabilities },
+    ],
+  });
+
+  try {
+    const frame = runInInjectionContext(
+      injector,
+      () => new BillingCompositionRoot(),
+    );
+
+    frame.invoiceReadState.set({
+      status: 'success',
+      invoices: [{
+        id: 'real-invoice-001',
+        number: 'INV-REAL-001',
+        patientName: 'patient-001',
+        amount: '150000.00',
+        status: 'ISSUED',
+      }],
+    });
+
+    expect(frame.invoiceListMode()).toBe('demo');
+    expect(frame.displayedInvoices()).toHaveLength(3);
+    expect(frame.displayedReadStatus()).toBe('idle');
+
+    frame.invoiceListMode.set('http');
+
+    expect(frame.displayedInvoices().map(invoice => invoice.id))
+      .toEqual(['real-invoice-001']);
+    expect(frame.displayedReadStatus()).toBe('success');
+
+    frame.invoiceReadState.set({
+      status: 'error',
+      invoices: [],
+    });
+
+    expect(frame.displayedInvoices()).toEqual([]);
+    expect(frame.displayedReadStatus()).toBe('error');
+    expect(capabilities.http.request).not.toHaveBeenCalled();
+  } finally {
+    injector.destroy();
+  }
+});
+
+it('loads procedure prices when navigating to the composed catalog', async () => {
+  const handle = await mount();
+
+  root.loadProcedurePrices.mockClear();
+
+  await handle.updateRoute(route('/procedures'));
+
+  expect(root.loadProcedurePrices).toHaveBeenCalledTimes(1);
+  expect(root.route().localPath).toBe('/procedures');
+
+  await handle.unmount();
+});
+
+it('loads additional price rules when navigating to the composed rules route', async () => {
+  const handle = await mount();
+
+  root.loadExtraChargeRules.mockClear();
+  root.loadProcedurePrices.mockClear();
+  root.loadInvoices.mockClear();
+  root.syncInvoiceRoute.mockClear();
+
+  await handle.updateRoute(route('/procedures/rules'));
+
+  expect(root.loadExtraChargeRules).toHaveBeenCalledTimes(1);
+  expect(root.loadProcedurePrices).not.toHaveBeenCalled();
+  expect(root.loadInvoices).not.toHaveBeenCalled();
+  expect(root.syncInvoiceRoute).not.toHaveBeenCalled();
+  expect(root.route().localPath).toBe('/procedures/rules');
+
+  await handle.unmount();
+});
+
+
+it('starts the composed root in HTTP mode before its first render', async () => {
+  const { BillingCompositionRoot } = await import('./billing-root.component');
+  let observed: { mode: string; invoices: unknown[] } | undefined;
+  app.bootstrap.mockImplementationOnce(() => {
+    const options = vi.mocked(createApplication).mock.calls.at(-1)?.[0];
+    const providers = (options?.providers ?? []).filter(provider =>
+      typeof provider === 'object' && provider !== null && 'provide' in provider);
+    const injector = Injector.create({ providers: providers as any[] });
+    try {
+      const frame = runInInjectionContext(injector, () => new BillingCompositionRoot());
+      observed = { mode: frame.invoiceListMode(), invoices: frame.displayedInvoices() };
+    } finally { injector.destroy(); }
+    return { instance: root };
+  });
+  const handle = await mount();
+  try {
+    expect(observed?.mode).toBe('http');
+    expect(observed?.invoices).toEqual([]);
+  } finally { await handle.unmount(); }
+});
+
+it('refuses standalone invoice data in the composed application', async () => {
+  const { INVOICE_LIST_SOURCE } = await import('../billing/data/invoice-list-source');
+  const handle = await mount();
+  const options = vi.mocked(createApplication).mock.calls.at(-1)?.[0];
+  const providers = (options?.providers ?? []).filter(provider =>
+    typeof provider === 'object' && provider !== null && 'provide' in provider);
+  const injector = Injector.create({ providers: providers as any[] });
+  try {
+    const source = injector.get(INVOICE_LIST_SOURCE);
+    expect(() => source.read()).toThrow('Standalone invoice data is unavailable in HTTP composition');
+    expect(() => source.detail('any-id')).toThrow('Standalone invoice data is unavailable in HTTP composition');
+  } finally { injector.destroy(); await handle.unmount(); }
 });

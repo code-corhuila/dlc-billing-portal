@@ -1,8 +1,10 @@
 import { CommonModule } from '@angular/common';
-import { Component, signal } from '@angular/core';
+import { Component, EventEmitter, Input, Output, signal, ViewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 
+import type { CreateHttpExtraChargeRuleRequest, HttpExtraChargeRule } from '../../data/extra-charge-rules-http';
+import { ExtraChargeRuleCreateFormComponent } from './extra-charge-rule-create-form.component';
 import { EXTRA_CHARGE_RULE_FIXTURES } from '../../data/extra-charge-rules.mock';
 import {
   CreateExtraChargeRuleRequest,
@@ -17,8 +19,58 @@ import {
     CommonModule,
     FormsModule,
     RouterLink,
+    ExtraChargeRuleCreateFormComponent,
   ],
   template: `
+    @if (composed) {
+      <main class="billing-page">
+        <header class="page-header">
+          <div>
+            <p class="eyebrow">Billing</p>
+            <h1>Reglas de cargos adicionales</h1>
+            <p class="description">Consulta de reglas registradas en Billing.</p>
+          </div>
+          <dlc-extra-charge-rule-create-form [canManageRules]="canManageRules"
+            [creating]="creatingHttpRule" [savedRule]="savedHttpRule" [message]="creationMessage"
+            (createRule)="createRule.emit($event)" />
+        </header>
+
+        @if (composedReadMessage; as message) {
+          <section class="state-card" [class.error-state]="httpReadStatus === 'error'" role="status">
+            <p>{{ message }}</p>
+          </section>
+        } @else {
+          <section class="catalog-card">
+            <div class="table-wrapper">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Código</th>
+                    <th>Tipo</th>
+                    <th>Precio unitario (COP)</th>
+                    <th>Aprobación requerida</th>
+                    <th>Versión</th>
+                    <th>Vigente desde</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (rule of composedRuleDetails; track rule.code + ':' + rule.version) {
+                    <tr>
+                      <td>{{ rule.code }}</td>
+                      <td>{{ rule.itemType }}</td>
+                      <td>{{ rule.unitPrice }}</td>
+                      <td>{{ rule.requiresApproval ? 'Sí' : 'No' }}</td>
+                      <td>v{{ rule.version }}</td>
+                      <td>{{ rule.validFrom }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </section>
+        }
+      </main>
+    } @else {
     <main class="billing-page">
 
       <header class="page-header">
@@ -401,6 +453,7 @@ import {
       }
 
     </main>
+    }
   `,
   styles: [`
     :host {
@@ -705,6 +758,50 @@ import {
 })
 export class ExtraChargeRulesComponent {
 
+  @Input() composed = false;
+  @Input() canManageRules = false;
+  @Input() creatingHttpRule = false;
+  @Input() creationMessage = '';
+  @Input() savedHttpRule: HttpExtraChargeRule | null = null;
+  @Output() readonly createRule = new EventEmitter<CreateHttpExtraChargeRuleRequest>();
+  @ViewChild(ExtraChargeRuleCreateFormComponent) creationForm?: ExtraChargeRuleCreateFormComponent;
+  get creationDirty(): boolean { return this.creationForm?.dirty ?? false; }
+  @Input() httpRules: HttpExtraChargeRule[] = [];
+  @Input() httpReadStatus: 'idle' | 'loading' | 'success' | 'error' = 'idle';
+
+  get displayedRules(): Array<ExtraChargeRule | HttpExtraChargeRule> {
+    if (!this.composed) {
+      return this.rules();
+    }
+
+    return this.httpReadStatus === 'success'
+      ? this.httpRules
+      : [];
+  }
+
+  get composedRuleDetails(): Array<Pick<HttpExtraChargeRule,
+    'code' | 'itemType' | 'unitPrice' | 'requiresApproval' | 'validFrom' | 'version'>> {
+    if (!this.composed || this.httpReadStatus !== 'success') return [];
+
+    return this.httpRules.map(({ code, itemType, unitPrice,
+      requiresApproval, validFrom, version }) => ({
+      code, itemType, unitPrice, requiresApproval, validFrom, version,
+    }));
+  }
+
+  get composedReadMessage(): string {
+    if (!this.composed) return '';
+    if (this.httpReadStatus === 'error') {
+      return 'No fue posible cargar las reglas adicionales.';
+    }
+    if (this.httpReadStatus === 'loading' || this.httpReadStatus === 'idle') {
+      return 'Cargando reglas adicionales...';
+    }
+    return this.httpRules.length === 0
+      ? 'No hay reglas adicionales para mostrar.'
+      : '';
+  }
+
   readonly rules = signal<ExtraChargeRule[]>([
     ...EXTRA_CHARGE_RULE_FIXTURES,
   ]);
@@ -766,6 +863,10 @@ export class ExtraChargeRulesComponent {
 
   openForm(): void {
 
+    if (this.composed) {
+      return;
+    }
+
     this.successMessage.set('');
     this.errorMessage.set('');
 
@@ -785,6 +886,10 @@ export class ExtraChargeRulesComponent {
   }
 
   submitRule(): void {
+
+    if (this.composed) {
+      return;
+    }
 
     if (
       this.form.amount === null ||
@@ -890,12 +995,20 @@ export class ExtraChargeRulesComponent {
 
   simulateEmpty(): void {
 
+    if (this.composed) {
+      return;
+    }
+
     this.successMessage.set('');
     this.errorMessage.set('');
     this.rules.set([]);
   }
 
   simulateError(): void {
+
+    if (this.composed) {
+      return;
+    }
 
     this.successMessage.set('');
 
@@ -907,6 +1020,10 @@ export class ExtraChargeRulesComponent {
   }
 
   restoreFixtures(): void {
+
+    if (this.composed) {
+      return;
+    }
 
     this.successMessage.set('');
     this.errorMessage.set('');

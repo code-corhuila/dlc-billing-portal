@@ -1,0 +1,504 @@
+import '@angular/compiler';
+import { expect, it, vi } from 'vitest';
+import { InvoiceDetailHttpPageComponent } from './invoice-detail-http-page.component';
+import {
+  createInvoiceDetailReadState,
+  invoiceDetailReadSuccess,
+  type InvoiceDetailReadState,
+} from '../data/invoice-detail-read-state';
+import type { ReadInvoice } from '../data/invoice-read-adapter';
+import { copMoney } from '../model/cop-money';
+
+const invoice: ReadInvoice = {
+  id: '11111111-1111-4111-8111-111111111111',
+  patientId: '22222222-2222-4222-8222-222222222222',
+  appointmentId: '33333333-3333-4333-8333-333333333333',
+  invoiceNumber: 'INV-2026-001',
+  items: [{
+    id: '44444444-4444-4444-8444-444444444444',
+    patientId: '22222222-2222-4222-8222-222222222222',
+    procedureId: '55555555-5555-4555-8555-555555555555',
+    description: 'Dental procedure',
+    quantity: '1.2500',
+    unitPrice: copMoney('120000.00'),
+    currency: 'COP',
+    version: 1,
+    status: 'BILLED',
+  }],
+  total: copMoney('150000.00'),
+  balance: copMoney('75000.00'),
+  currency: 'COP',
+  status: 'PARTIALLY_PAID',
+  version: 3,
+};
+
+function setup(state: InvoiceDetailReadState = createInvoiceDetailReadState()) {
+  const page = new InvoiceDetailHttpPageComponent();
+  page.readState = state;
+  return page;
+}
+
+it('starts idle without selecting a demo invoice', () => {
+  const page = setup();
+
+  expect(page.readState.status).toBe('idle');
+  expect(page.selectedInvoice).toBeUndefined();
+  expect(page.statusMessage).toBe('No se ha consultado una factura.');
+});
+
+it('reports loading without exposing stale invoice data', () => {
+  const page = setup({
+    status: 'loading',
+    invoice: undefined,
+  });
+
+  expect(page.selectedInvoice).toBeUndefined();
+  expect(page.statusMessage).toBe('Consultando factura...');
+});
+
+it('presents only validated invoice fields and exact COP amounts', () => {
+  const page = setup(invoiceDetailReadSuccess(invoice));
+
+  expect(page.selectedInvoice).toBe(invoice);
+  expect(page.displayNumber).toBe('INV-2026-001');
+  expect(page.statusLabel).toBe('Pago parcial');
+  expect(page.formattedTotal).toBe('150.000,00');
+  expect(page.formattedBalance).toBe('75.000,00');
+  expect(page.selectedInvoice?.version).toBe(3);
+  expect(page.selectedInvoice?.patientId).toBe(invoice.patientId);
+  expect(page.selectedInvoice?.appointmentId).toBe(invoice.appointmentId);
+});
+
+it('uses the invoice identifier when the optional number is absent', () => {
+  const page = setup(invoiceDetailReadSuccess({
+    ...invoice,
+    invoiceNumber: undefined,
+    appointmentId: undefined,
+  }));
+
+  expect(page.displayNumber).toBe(invoice.id);
+  expect(page.selectedInvoice?.appointmentId).toBeUndefined();
+});
+
+it('reports errors without presenting stale invoice data', () => {
+  const page = setup({
+    status: 'error',
+    invoice: undefined,
+  });
+
+  expect(page.selectedInvoice).toBeUndefined();
+  expect(page.statusMessage).toBe('No fue posible consultar la factura.');
+});
+
+it('reports cancellation without presenting invoice data', () => {
+  const page = setup({
+    status: 'cancelled',
+    invoice: undefined,
+  });
+
+  expect(page.selectedInvoice).toBeUndefined();
+  expect(page.statusMessage).toBe('La consulta de la factura fue cancelada.');
+});
+
+it('provides a back event', () => {
+  const page = setup();
+  const back = vi.fn();
+
+  page.back.subscribe(back);
+  page.back.emit();
+
+  expect(back).toHaveBeenCalledOnce();
+});
+
+it('does not allow issuance by default', () => {
+  const page = setup(invoiceDetailReadSuccess({
+    ...invoice,
+    status: 'DRAFT',
+  }));
+
+  expect(page.canIssue).toBe(false);
+});
+
+it('allows authorized issuance only for a loaded DRAFT invoice', () => {
+  const page = setup(invoiceDetailReadSuccess({
+    ...invoice,
+    status: 'DRAFT',
+  }));
+
+  page.canIssueInvoices = true;
+
+  expect(page.canIssue).toBe(true);
+});
+
+it('does not allow issuance of an already issued invoice', () => {
+  const page = setup(invoiceDetailReadSuccess({
+    ...invoice,
+    status: 'ISSUED',
+  }));
+
+  page.canIssueInvoices = true;
+
+  expect(page.canIssue).toBe(false);
+});
+
+it('does not allow issuance of a partially paid invoice', () => {
+  const page = setup(invoiceDetailReadSuccess(invoice));
+  page.canIssueInvoices = true;
+
+  expect(page.canIssue).toBe(false);
+});
+
+it('does not allow issuance without a successful invoice read', () => {
+  const page = setup();
+  page.canIssueInvoices = true;
+
+  expect(page.canIssue).toBe(false);
+});
+
+it('emits the loaded invoice id and version without changing invoice data', () => {
+  const draft = {
+    ...invoice,
+    status: 'DRAFT' as const,
+  };
+
+  const page = setup(invoiceDetailReadSuccess(draft));
+  page.canIssueInvoices = true;
+
+  const issue = vi.fn();
+  page.issue.subscribe(issue);
+
+  page.requestIssuance();
+
+  expect(issue).toHaveBeenCalledExactlyOnceWith({
+    invoiceId: draft.id,
+    expectedVersion: draft.version,
+  });
+
+  expect(draft.status).toBe('DRAFT');
+  expect(draft.version).toBe(3);
+});
+
+it('does not emit an issuance event when unauthorized', () => {
+  const page = setup(invoiceDetailReadSuccess({
+    ...invoice,
+    status: 'DRAFT',
+  }));
+
+  const issue = vi.fn();
+  page.issue.subscribe(issue);
+
+  page.requestIssuance();
+
+  expect(issue).not.toHaveBeenCalled();
+});
+
+it('does not emit duplicate issuance intents while submitting', () => {
+  const page = setup(invoiceDetailReadSuccess({
+    ...invoice,
+    status: 'DRAFT',
+  }));
+
+  page.canIssueInvoices = true;
+  page.issuing = true;
+
+  const issue = vi.fn();
+  page.issue.subscribe(issue);
+
+  page.requestIssuance();
+
+  expect(page.canIssue).toBe(false);
+  expect(issue).not.toHaveBeenCalled();
+});
+
+it('does not allow PDF download by default', () => {
+  const page = setup(invoiceDetailReadSuccess({
+    ...invoice,
+    status: 'ISSUED',
+  }));
+
+  expect(page.canDownloadPdf).toBe(false);
+});
+
+it.each(['ISSUED', 'PARTIALLY_PAID', 'PAID'] as const)('allows an authorized PDF download for %s', status => {
+  const page = setup(invoiceDetailReadSuccess({
+    ...invoice,
+    status,
+  }));
+
+  page.canDownloadPdfInvoices = true;
+
+  expect(page.canDownloadPdf).toBe(true);
+});
+
+it('does not allow PDF download for a draft invoice', () => {
+  const page = setup(invoiceDetailReadSuccess({
+    ...invoice,
+    status: 'DRAFT',
+  }));
+
+  page.canDownloadPdfInvoices = true;
+
+  expect(page.canDownloadPdf).toBe(false);
+});
+
+it('does not allow PDF download without a successful invoice read', () => {
+  const page = setup();
+  page.canDownloadPdfInvoices = true;
+
+  expect(page.canDownloadPdf).toBe(false);
+});
+
+it('does not allow duplicate PDF downloads while downloading', () => {
+  const page = setup(invoiceDetailReadSuccess({
+    ...invoice,
+    status: 'ISSUED',
+  }));
+
+  page.canDownloadPdfInvoices = true;
+  page.downloadingPdf = true;
+
+  const download = vi.fn();
+  page.downloadPdf.subscribe(download);
+
+  page.requestPdfDownload();
+
+  expect(page.canDownloadPdf).toBe(false);
+  expect(download).not.toHaveBeenCalled();
+});
+
+it('emits the invoice identifier for an authorized PDF download', () => {
+  const issued = {
+    ...invoice,
+    status: 'ISSUED' as const,
+  };
+
+  const page = setup(invoiceDetailReadSuccess(issued));
+  page.canDownloadPdfInvoices = true;
+
+  const download = vi.fn();
+  page.downloadPdf.subscribe(download);
+
+  page.requestPdfDownload();
+
+  expect(download).toHaveBeenCalledExactlyOnceWith(issued.id);
+  expect(issued.status).toBe('ISSUED');
+  expect(issued.version).toBe(3);
+});
+
+it('does not emit a PDF download event when unauthorized', () => {
+  const page = setup(invoiceDetailReadSuccess({
+    ...invoice,
+    status: 'ISSUED',
+  }));
+
+  const download = vi.fn();
+  page.downloadPdf.subscribe(download);
+
+  page.requestPdfDownload();
+
+  expect(download).not.toHaveBeenCalled();
+});
+
+it('disables payment navigation by default', () => {
+  const page = setup(invoiceDetailReadSuccess(invoice));
+
+  expect(page.canPay).toBe(false);
+});
+
+it.each(['ISSUED', 'PARTIALLY_PAID'] as const)(
+  'allows authorized payment navigation for %s invoices with balance',
+  status => {
+    const page = setup(invoiceDetailReadSuccess({ ...invoice, status }));
+    page.canRecordPayments = true;
+
+    expect(page.canPay).toBe(true);
+  },
+);
+
+it.each(['DRAFT', 'PAID', 'CANCELLED'] as const)(
+  'blocks payment navigation for %s invoices',
+  status => {
+    const page = setup(invoiceDetailReadSuccess({ ...invoice, status }));
+    page.canRecordPayments = true;
+
+    expect(page.canPay).toBe(false);
+  },
+);
+
+it('blocks payment navigation when the balance is zero', () => {
+  const page = setup(invoiceDetailReadSuccess({
+    ...invoice,
+    balance: copMoney('0.00'),
+  }));
+  page.canRecordPayments = true;
+
+  expect(page.canPay).toBe(false);
+});
+
+it('emits the invoice identifier only when payment is authorized', () => {
+  const page = setup(invoiceDetailReadSuccess(invoice));
+  const pay = vi.fn();
+  page.pay.subscribe(pay);
+
+  page.requestPayment();
+  expect(pay).not.toHaveBeenCalled();
+
+  page.canRecordPayments = true;
+  page.requestPayment();
+
+  expect(pay).toHaveBeenCalledExactlyOnceWith(invoice.id);
+  expect(page.selectedInvoice?.status).toBe('PARTIALLY_PAID');
+  expect(page.selectedInvoice?.balance).toBe('75000.00');
+});
+
+it('does not emit payment navigation without a loaded invoice', () => {
+  const page = setup();
+  const pay = vi.fn();
+  page.pay.subscribe(pay);
+  page.canRecordPayments = true;
+
+  page.requestPayment();
+
+  expect(page.canPay).toBe(false);
+  expect(pay).not.toHaveBeenCalled();
+});
+
+it('allows authorized payment history access for the selected invoice', () => {
+  const page = setup(invoiceDetailReadSuccess(invoice));
+  page.canReadPaymentHistory = true;
+
+  const read = vi.fn();
+  page.readPaymentHistory.subscribe(read);
+
+  page.requestPaymentHistory();
+
+  expect(read).toHaveBeenCalledExactlyOnceWith({
+    invoiceId: invoice.id,
+    page: 1,
+  });
+});
+
+it('blocks payment history requests without authorization or invoice', () => {
+  const page = setup(invoiceDetailReadSuccess(invoice));
+  const read = vi.fn();
+  page.readPaymentHistory.subscribe(read);
+
+  page.requestPaymentHistory();
+  expect(read).not.toHaveBeenCalled();
+
+  page.canReadPaymentHistory = true;
+  page.readState = createInvoiceDetailReadState();
+  page.requestPaymentHistory();
+
+  expect(read).not.toHaveBeenCalled();
+});
+
+it('never displays payments belonging to another invoice', () => {
+  const page = setup(invoiceDetailReadSuccess(invoice));
+  page.canReadPaymentHistory = true;
+  page.paymentHistory = {
+    status: 'success',
+    invoiceId: '44444444-4444-4444-8444-444444444444',
+    data: [{
+      id: '55555555-5555-4555-8555-555555555555',
+      invoiceId: '44444444-4444-4444-8444-444444444444',
+      amount: copMoney('25000.00'),
+      method: 'CASH',
+      recordedBy: '66666666-6666-4666-8666-666666666666',
+      recordedAt: '2026-11-01T14:00:00Z',
+      version: 1,
+    }],
+    meta: { page: 1, limit: 20, total: 1, totalPages: 1 },
+  };
+
+  expect(page.displayedPaymentHistory).toEqual([]);
+});
+
+it('displays validated payments and supports pagination', () => {
+  const page = setup(invoiceDetailReadSuccess(invoice));
+  page.canReadPaymentHistory = true;
+  page.paymentHistory = {
+    status: 'success',
+    invoiceId: invoice.id,
+    data: [{
+      id: '55555555-5555-4555-8555-555555555555',
+      invoiceId: invoice.id,
+      amount: copMoney('25000.01'),
+      method: 'CASH',
+      recordedBy: '66666666-6666-4666-8666-666666666666',
+      recordedAt: '2026-11-01T14:00:00Z',
+      version: 1,
+    }],
+    meta: { page: 1, limit: 20, total: 21, totalPages: 2 },
+  };
+
+  expect(page.displayedPaymentHistory).toHaveLength(1);
+  expect(page.formatPaymentAmount(
+    page.displayedPaymentHistory[0].amount,
+  )).toBe('25.000,01');
+
+  const read = vi.fn();
+  page.readPaymentHistory.subscribe(read);
+  page.requestPaymentHistoryPage(2);
+
+  expect(read).toHaveBeenCalledExactlyOnceWith({
+    invoiceId: invoice.id,
+    page: 2,
+  });
+});
+
+it('blocks invalid pagination and requests while loading', () => {
+  const page = setup(invoiceDetailReadSuccess(invoice));
+  page.canReadPaymentHistory = true;
+  page.paymentHistory = {
+    status: 'loading',
+    invoiceId: invoice.id,
+    data: [],
+    meta: { page: 1, limit: 20, total: 0, totalPages: 0 },
+  };
+
+  const read = vi.fn();
+  page.readPaymentHistory.subscribe(read);
+
+  page.requestPaymentHistoryPage(0);
+  page.requestPaymentHistoryPage(2);
+
+  expect(read).not.toHaveBeenCalled();
+});
+
+it('exposes validated invoice items only after a successful read', () => {
+  const page = setup(invoiceDetailReadSuccess(invoice));
+
+  expect(page.displayedItems).toEqual(invoice.items);
+
+  page.readState = { status: 'loading', invoice: undefined };
+  expect(page.displayedItems).toEqual([]);
+});
+
+it('preserves exact item quantities and formats COP unit prices', () => {
+  const page = setup(invoiceDetailReadSuccess(invoice));
+
+  expect(page.displayedItems[0].quantity).toBe('1.2500');
+  expect(page.formatItemPrice(page.displayedItems[0].unitPrice))
+    .toBe('120.000,00');
+});
+
+it('provides Spanish labels for documented billable item statuses', () => {
+  const page = setup(invoiceDetailReadSuccess(invoice));
+
+  expect(page.itemStatusLabel('BILLED')).toBe('Facturado');
+  expect(page.itemStatusLabel('UNBILLED')).toBe('Pendiente de facturar');
+});
+
+it('returns an empty list when the invoice has no billable items', () => {
+  const page = setup(invoiceDetailReadSuccess({ ...invoice, items: [] }));
+
+  expect(page.displayedItems).toEqual([]);
+});
+
+it('blocks issuance while a correction is pending or its form is dirty', () => {
+  const draft={...invoice,status:'DRAFT' as const,items:invoice.items.map(item=>({...item,approvalRequired:true}))};
+  const page=setup(invoiceDetailReadSuccess(draft));page.canIssueInvoices=true;
+  const emit=vi.spyOn(page.issue,'emit');
+  expect(page.canIssue).toBe(false);page.requestIssuance();expect(emit).not.toHaveBeenCalled();
+});

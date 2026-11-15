@@ -1,47 +1,66 @@
 import { CommonModule } from '@angular/common';
-import { Component, DestroyRef, ElementRef, Input, ViewChild, inject, signal } from '@angular/core';
-import { copMoney, CopMoney } from '../../../model/cop-money';
-import { formatCopMoney } from '../../../presentation/format-cop-money';
+import {
+  Component,
+  DestroyRef,
+  ElementRef,
+  EventEmitter,
+  Input,
+  Output,
+  ViewChild,
+  inject,
+  signal,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-
+import { copMoney, type CopMoney } from '../../../model/cop-money';
+import { formatCopMoney } from '../../../presentation/format-cop-money';
+import type {
+  CreateHttpProcedurePriceRequest,
+  HttpProcedurePrice,
+} from '../../data/procedure-prices-http';
 import {
-  CreateProcedurePriceRequest,
-  ProcedurePrice,
-  ProcedurePriceStatus,
+  type CreateProcedurePriceRequest,
+  type ProcedurePrice,
+  type ProcedurePriceStatus,
 } from '../../model/procedure-price.model';
-import { PricingCatalogService, localIsoDate } from '../../services/pricing-catalog.service';
+import {
+  PricingCatalogService,
+  localIsoDate,
+} from '../../services/pricing-catalog.service';
+
+export type CatalogReadStatus = 'idle' | 'loading' | 'success' | 'error';
 
 @Component({
   selector: 'dlc-pricing-catalog',
   standalone: true,
-  imports: [
-    CommonModule,
-    FormsModule,
-    RouterLink,
-  ],
+  imports: [CommonModule, FormsModule, RouterLink],
   templateUrl: './pricing-catalog.component.html',
   styleUrl: './pricing-catalog.component.css',
 })
 export class PricingCatalogComponent {
   @ViewChild('priceDialog') priceDialog?: ElementRef<HTMLDialogElement>;
   @ViewChild('newPriceButton') newPriceButton?: ElementRef<HTMLButtonElement>;
-  // false: new procedure (version 1); true: new price version of an existing procedure.
-  editing = false;
-  today = localIsoDate();
+
   @Input() composed = false;
   @Input() canManagePrices = true;
-  private readonly pricingCatalogService =
-    inject(PricingCatalogService);
+  @Input() httpPrices: HttpProcedurePrice[] = [];
+  @Input() httpReadStatus: CatalogReadStatus = 'idle';
+  @Input() creatingHttpPrice = false;
+  @Input() set savedHttpPrice(value: HttpProcedurePrice | null) {
+    if (value) this.resetForSession();
+  }
 
-  readonly prices = this.pricingCatalogService.demoPrices;
+  @Output() readonly createPrice =
+    new EventEmitter<CreateHttpProcedurePriceRequest>();
+
+  editing = false;
+  today = localIsoDate();
+
+  private readonly pricingCatalogService = inject(PricingCatalogService);
   private readonly destroyRef = inject(DestroyRef);
   private pendingTimer?: ReturnType<typeof setTimeout>;
 
-  constructor() {
-    this.destroyRef.onDestroy(() => clearTimeout(this.pendingTimer));
-  }
-
+  readonly prices = this.pricingCatalogService.demoPrices;
   readonly formVisible = signal(false);
   readonly submitting = signal(false);
   readonly successMessage = signal('');
@@ -50,14 +69,59 @@ export class PricingCatalogComponent {
   searchTerm = '';
   onlyActive = true;
 
-  form: CreateProcedurePriceRequest =
-    this.createEmptyForm();
+  form: CreateProcedurePriceRequest = this.createEmptyForm();
+
+  constructor() {
+    this.destroyRef.onDestroy(() => clearTimeout(this.pendingTimer));
+  }
+
+  resetForSession(): void {
+    this.formVisible.set(false);
+    this.priceDialog?.nativeElement.close();
+    this.resetForm();
+    this.editing = false;
+    this.clearMessages();
+    this.newPriceButton?.nativeElement.focus();
+  }
+
+  canVersionHttp(price: HttpProcedurePrice): boolean {
+    return this.composed && this.canManagePrices && this.httpReadStatus === 'success'
+      && !this.creatingHttpPrice && !this.httpPrices.some(other =>
+        other.procedureCode === price.procedureCode && other.version > price.version);
+  }
+
+  openForHttpPrice(price: HttpProcedurePrice): void {
+    if (!this.canVersionHttp(price) || this.destroyRef.destroyed) return;
+    this.openForm();
+    this.editing = true;
+    this.form = { procedureCode: price.procedureCode, procedureName: price.name,
+      amount: price.basePrice, validFrom: '' };
+  }
+
+  get displayedPrices(): HttpProcedurePrice[] {
+    if (!this.composed || this.httpReadStatus !== 'success') {
+      return [];
+    }
+
+    const term = this.searchTerm.trim().toLowerCase();
+
+    return this.httpPrices.filter(price => {
+      if (this.onlyActive && price.status !== 'ACTIVE') return false;
+
+      return !term
+        || price.name.toLowerCase().includes(term)
+        || price.procedureCode.toLowerCase().includes(term);
+    });
+  }
 
   get filteredPrices(): ProcedurePrice[] {
+    if (this.composed) return [];
+
     const prices = this.pricingCatalogService.filterPrices(
       this.prices(),
       this.searchTerm,
     );
+
     return this.onlyActive
       ? prices.filter(price => this.statusOf(price) !== 'HISTORICAL')
       : prices;
@@ -68,32 +132,74 @@ export class PricingCatalogComponent {
   }
 
   statusLabel(price: ProcedurePrice): string {
-    return { CURRENT: 'Vigente', SCHEDULED: 'Programado', HISTORICAL: 'Histórico' }[this.statusOf(price)];
+    return {
+      CURRENT: 'Vigente',
+      SCHEDULED: 'Programado',
+      HISTORICAL: 'Histórico',
+    }[this.statusOf(price)];
   }
 
-  /** Only the latest version of a procedure can be followed by a new one. */
   canVersion(price: ProcedurePrice): boolean {
-    return this.canManagePrices &&
-      this.pricingCatalogService.latestVersion(this.prices(), price.procedureCode)?.id === price.id;
+    return !this.composed
+      && this.canManagePrices
+      && this.pricingCatalogService.latestVersion(
+        this.prices(),
+        price.procedureCode,
+      )?.id === price.id;
   }
 
   get duplicateCode(): boolean {
-    return !this.editing && this.form.procedureCode.trim().length > 0 &&
-      this.pricingCatalogService.hasProcedure(this.prices(), this.form.procedureCode);
+    if (this.editing || !this.form.procedureCode.trim()) {
+      return false;
+    }
+
+    if (this.composed) {
+      return this.httpPrices.some(
+        price => price.procedureCode.toLowerCase()
+          === this.form.procedureCode.trim().toLowerCase(),
+      );
+    }
+
+    return this.pricingCatalogService.hasProcedure(
+      this.prices(),
+      this.form.procedureCode,
+    );
   }
 
   get minValidFrom(): string {
+    if (this.composed) {
+      if (!this.editing) return '';
+
+      const dates = this.httpPrices
+        .filter(price => price.procedureCode === this.form.procedureCode)
+        .map(price => price.validFrom?.slice(0, 10))
+        .filter((date): date is string => !!date);
+
+      const latest = dates.sort().at(-1);
+      return latest ? new Date(Date.parse(`${latest}T00:00:00Z`) + 86400000).toISOString().slice(0, 10) : '';
+    }
+
     return this.editing
-      ? this.pricingCatalogService.minVersionDate(this.prices(), this.form.procedureCode)
+      ? this.pricingCatalogService.minVersionDate(
+        this.prices(),
+        this.form.procedureCode,
+      )
       : '';
   }
 
   get validFromTooEarly(): boolean {
-    return this.form.validFrom.length > 0 && this.form.validFrom < this.minValidFrom;
+    return this.form.validFrom.length > 0
+      && this.form.validFrom < this.minValidFrom;
   }
 
   openForm(): void {
-    if (!this.canManagePrices || this.submitting() || this.destroyRef.destroyed) return;
+    if (
+      !this.canManagePrices
+      || this.submitting()
+      || this.creatingHttpPrice
+      || this.destroyRef.destroyed
+    ) return;
+
     this.clearMessages();
     this.resetForm();
     this.formVisible.set(true);
@@ -102,23 +208,50 @@ export class PricingCatalogComponent {
   }
 
   openForPrice(price: ProcedurePrice): void {
-    if (!this.canVersion(price) || this.submitting() || this.destroyRef.destroyed) return;
+    if (
+      this.composed
+      || !this.canVersion(price)
+      || this.submitting()
+      || this.destroyRef.destroyed
+    ) return;
+
     this.openForm();
     this.editing = true;
-    this.form = { procedureCode: price.procedureCode, procedureName: price.procedureName, amount: price.amount, validFrom: '' };
+    this.form = {
+      procedureCode: price.procedureCode,
+      procedureName: price.procedureName,
+      amount: price.amount,
+      validFrom: '',
+    };
   }
 
   closeForm(): void {
-    if (this.submitting()) {
-      return;
-    }
+    if (this.submitting() || this.creatingHttpPrice) return;
 
     this.formVisible.set(false);
     this.priceDialog?.nativeElement.close();
   }
 
   submitPrice(): void {
-    if (!this.canManagePrices || this.destroyRef.destroyed || this.submitting() || !this.isFormValid()) {
+    if (
+      !this.canManagePrices
+      || this.destroyRef.destroyed
+      || this.submitting()
+      || this.creatingHttpPrice
+      || !this.isFormValid()
+    ) return;
+
+    if (this.composed) {
+      if (!this.formVisible()) return;
+
+      const request: CreateHttpProcedurePriceRequest = {
+        procedureCode: this.form.procedureCode.trim(),
+        name: this.form.procedureName.trim(),
+        basePrice: copMoney(this.form.amount),
+        validFrom: `${this.form.validFrom}T00:00:00Z`,
+      };
+
+      this.createPrice.emit(request);
       return;
     }
 
@@ -126,39 +259,51 @@ export class PricingCatalogComponent {
     const request = { ...this.form };
 
     this.pendingTimer = setTimeout(() => {
-      if (this.destroyRef.destroyed) return;
-      if (!this.canManagePrices) { this.submitting.set(false); return; }
+      if (this.composed || this.destroyRef.destroyed) return;
+
+      if (!this.canManagePrices) {
+        this.submitting.set(false);
+        return;
+      }
+
       const editing = this.editing;
       const updatedPrices = editing
-        ? this.pricingCatalogService.createNewVersion(this.prices(), request)
-        : this.pricingCatalogService.createProcedure(this.prices(), request);
+        ? this.pricingCatalogService.createNewVersion(
+          this.prices(),
+          request,
+        )
+        : this.pricingCatalogService.createProcedure(
+          this.prices(),
+          request,
+        );
 
       this.prices.set(updatedPrices);
-
       this.finishSubmitting(editing);
     }, 900);
   }
 
   simulateError(): void {
+    if (this.composed) return;
+
     this.successMessage.set('');
     this.prices.set([]);
-
     this.errorMessage.set(
       'Error simulado al consultar los precios de Billing.',
     );
   }
 
   simulateEmpty(): void {
+    if (this.composed) return;
+
     this.clearMessages();
     this.prices.set([]);
   }
 
   restoreFixtures(): void {
-    this.clearMessages();
+    if (this.composed) return;
 
-    this.prices.set(
-      this.pricingCatalogService.getFixtures(),
-    );
+    this.clearMessages();
+    this.prices.set(this.pricingCatalogService.getFixtures());
   }
 
   formatMoney(amount: CopMoney): string {
@@ -166,18 +311,22 @@ export class PricingCatalogComponent {
   }
 
   get validAmount(): boolean {
-    try { return BigInt(copMoney(this.form.amount).replace('.', '')) > 0n; }
-    catch { return false; }
+    try {
+      return BigInt(copMoney(this.form.amount).replace('.', '')) > 0n;
+    } catch {
+      return false;
+    }
   }
 
   private isFormValid(): boolean {
     return (
-      this.form.procedureCode.trim().length > 0 &&
-      this.form.procedureName.trim().length > 0 &&
-      this.validAmount &&
-      this.form.validFrom.length > 0 &&
-      !this.duplicateCode &&
-      !this.validFromTooEarly
+      this.form.procedureCode.trim().length > 0
+      && this.form.procedureName.trim().length > 0
+      && this.validAmount
+      && /^\d{4}-\d{2}-\d{2}$/.test(this.form.validFrom)
+      && Number.isFinite(Date.parse(`${this.form.validFrom}T00:00:00Z`))
+      && !this.duplicateCode
+      && !this.validFromTooEarly
     );
   }
 
@@ -190,9 +339,13 @@ export class PricingCatalogComponent {
     this.submitting.set(false);
     this.formVisible.set(false);
     this.priceDialog?.nativeElement.close();
+
     const button = this.newPriceButton?.nativeElement;
-    // Apply the completed UI state before focusing; Angular renders disabled asynchronously.
-    if (button) { button.disabled = false; button.focus(); }
+
+    if (button) {
+      button.disabled = false;
+      button.focus();
+    }
 
     this.successMessage.set(editing
       ? 'Nueva versión de precio registrada correctamente en la demostración.'
